@@ -8,12 +8,19 @@ A custom Lovelace card for the [Climate Scheduler](https://github.com/kneave/cli
 
 ### HACS (Recommended)
 
+**Note**: This card is pending inclusion in the HACS default store. Until then, add it as a custom repository:
+
 1. Open HACS
-2. Go to "Frontend"
-3. Click "+ Explore & Download Repositories"
-4. Search for "Climate Scheduler Card"
-5. Click "Download"
-6. Restart Home Assistant (not always required, but recommended)
+2. Click on "Frontend"
+3. Click the three dots menu in the top right
+4. Select "Custom repositories"
+5. Add `https://github.com/kneave/climate-scheduler-card` as repository
+6. Select "Dashboard" as category
+7. Click "Add"
+8. Click "+ Explore & Download Repositories"
+9. Search for "Climate Scheduler Card"
+10. Click "Download"
+11. Restart Home Assistant (not always required, but recommended)
 
 ### Manual Installation
 
