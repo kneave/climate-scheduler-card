@@ -1,5 +1,6 @@
 ﻿{
   "name": "Climate Scheduler Card",
   "render_readme": true,
-  "filename": "climate-scheduler-card.js"
+  "filename": "climate-scheduler-card.js",
+  "homeassistant": "2024.1.0"
 }
