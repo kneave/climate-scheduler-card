@@ -21,11 +21,12 @@ let scriptsLoaded = false;
 const loadScripts = () => {
     if (scriptsLoaded) return Promise.resolve();
     
+    const basePath = '/local/community/climate-scheduler-card';
     return Promise.all([
-        loadScript('/api/climate_scheduler/graph.js'),
-        loadScript('/api/climate_scheduler/ha-api.js')
+        loadScript(`${basePath}/graph.js`),
+        loadScript(`${basePath}/ha-api.js`)
     ]).then(() => {
-        return loadScript('/api/climate_scheduler/app.js');
+        return loadScript(`${basePath}/app.js`);
     }).then(() => {
         scriptsLoaded = true;
     }).catch(error => {
@@ -102,7 +103,7 @@ class ClimateSchedulerPanel extends HTMLElement {
             // Load CSS into light DOM
             const styleLink = document.createElement('link');
             styleLink.rel = 'stylesheet';
-            styleLink.href = `/api/climate_scheduler/styles.css?v=${version}`;
+            styleLink.href = `/local/community/climate-scheduler-card/styles.css?v=${version}`;
             this.appendChild(styleLink);
 
             // Create container div for content

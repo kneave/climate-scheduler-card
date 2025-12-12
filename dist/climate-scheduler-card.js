@@ -37,7 +37,7 @@ class ClimateSchedulerCard extends HTMLElement {
     if (!this.shadowRoot) {
       const shadow = this.attachShadow({ mode: 'open' });
       const style = document.createElement('style');
-      style.textContent = \:host { display: block; } .wrapper { width: 100%; min-height: 400px; }\;
+      style.textContent = `:host { display: block; } .wrapper { width: 100%; min-height: 400px; }`;
       shadow.appendChild(style);
       
       this._container = document.createElement('div');
@@ -63,9 +63,9 @@ class ClimateSchedulerCard extends HTMLElement {
     );
 
     if (!hasIntegration) {
-      this._container.innerHTML = \
+      this._container.innerHTML = `
         <div style="padding: 16px; color: red; border: 1px solid red; border-radius: 4px; margin: 16px;">
-          <h3>âŒ Climate Scheduler Integration Not Found</h3>
+          <h3>❌ Climate Scheduler Integration Not Found</h3>
           <p>This card requires the Climate Scheduler integration to be installed.</p>
           <p>Install it from HACS or visit: 
             <a href="https://github.com/kneave/climate-scheduler" target="_blank" style="color: #03a9f4;">
@@ -73,7 +73,7 @@ class ClimateSchedulerCard extends HTMLElement {
             </a>
           </p>
         </div>
-      \;
+      `;
       return;
     }
 
@@ -82,15 +82,15 @@ class ClimateSchedulerCard extends HTMLElement {
       const basePath = '/local/community/climate-scheduler-card';
       
       if (!customElements.get('climate-scheduler-panel')) {
-        await import(\\/panel.js\);
+        await import(`${basePath}/panel.js`);
       }
     } catch (e) {
-      this._container.innerHTML = \
+      this._container.innerHTML = `
         <div style="padding: 16px; color: red;">
-          Failed to load panel module: \<br>
+          Failed to load panel module: ${e.message}<br>
           Make sure the card is properly installed in /config/www/community/climate-scheduler-card/
         </div>
-      \;
+      `;
       return;
     }
 
