@@ -201,9 +201,10 @@ async function loadAllSchedules() {
             // Extract schedule from response wrapper
             const schedule = result?.response || result;
             
-            // Only add to entitySchedules if it has nodes AND is enabled
-            if (schedule && schedule.nodes && schedule.nodes.length > 0 && schedule.enabled) {
-                // Entity has an enabled schedule - add to Map
+            // Only add to entitySchedules if it has nodes AND is not ignored
+            // The enabled state affects visual display, not categorization
+            if (schedule && schedule.nodes && schedule.nodes.length > 0 && !schedule.ignored) {
+                // Entity has a schedule and is not ignored - add to Map
                 entitySchedules.set(entity.entity_id, schedule.nodes);
             }
         }
@@ -660,6 +661,63 @@ function displayGroupMembersTable(entityIds) {
     const graphContainer = getDocumentRoot().querySelector('.graph-container');
     if (graphContainer) {
         graphContainer.parentNode.insertBefore(table, graphContainer);
+    }
+}
+
+// Toggle entity inclusion (enable/disable entity)
+async function toggleEntityInclusion(entityId, enable = true) {
+    try {
+        if (enable) {
+            // Check if entity already has a schedule
+            const existingSchedule = await haAPI.getSchedule(entityId);
+            const schedule = existingSchedule?.response || existingSchedule;
+            
+            if (!schedule || !schedule.nodes || schedule.nodes.length === 0) {
+                // Entity has no schedule, initialize with default
+                const defaultSchedule = defaultScheduleSettings.length > 0 
+                    ? defaultScheduleSettings.map(node => ({...node}))
+                    : [{ time: '00:00', temp: 18 }];
+                
+                await haAPI.setSchedule(entityId, defaultSchedule, 'all_days', 'all_days');
+                
+                // Add to local Map
+                entitySchedules.set(entityId, defaultSchedule);
+            } else {
+                // Entity has a schedule, un-ignore it and enable it
+                await haAPI.setIgnored(entityId, false);
+                await haAPI.enableSchedule(entityId);
+                
+                // Add to local Map
+                entitySchedules.set(entityId, schedule.nodes);
+            }
+            
+            showToast('Entity enabled', 'success');
+        } else {
+            // Disable entity - mark as ignored instead of deleting
+            try {
+                await haAPI.setIgnored(entityId, true);
+                
+                // Remove from local Map only after successfully marked as ignored
+                entitySchedules.delete(entityId);
+                
+                showToast('Entity ignored', 'success');
+            } catch (ignoreError) {
+                throw ignoreError; // Re-throw to be caught by outer catch
+            }
+        }
+        
+        // Re-render entity list to update UI
+        await renderEntityList();
+        
+        // If enabling, optionally expand the editor for this entity
+        if (enable) {
+            selectEntity(entityId);
+        }
+    } catch (error) {
+        showToast(`Failed to ${enable ? 'enable' : 'disable'} entity`, 'error');
+        
+        // On error, reload schedules from backend to sync state
+        await loadAllSchedules();
     }
 }
 
@@ -1216,12 +1274,19 @@ function attachEditorEventListeners(editorElement) {
     // Ignore button
     const ignoreBtn = editorElement.querySelector('#ignore-entity-btn');
     if (ignoreBtn) {
-        ignoreBtn.onclick = async () => {
-            if (!currentEntityId) return;
+        ignoreBtn.onclick = async (event) => {
+            if (!currentEntityId) {
+                return;
+            }
             
-            await toggleEntityInclusion(currentEntityId, false);
-            collapseAllEditors();
-            currentEntityId = null;
+            try {
+                await toggleEntityInclusion(currentEntityId, false);
+                
+                collapseAllEditors();
+                currentEntityId = null;
+            } catch (error) {
+                console.error('Error during ignore operation:', error);
+            }
         };
     }
     
@@ -2776,9 +2841,10 @@ function setupEventListeners() {
             if (dropdownMenu) dropdownMenu.style.display = 'none';
             try {
                 await haAPI.callService('climate_scheduler', 'reload_integration', {});
-                setTimeout(() => window.location.reload(), 2000);
+                showToast('Integration reloaded successfully', 'success');
             } catch (error) {
                 console.error('Failed to reload integration:', error);
+                showToast('Failed to reload integration: ' + error.message, 'error');
             }
         });
     }

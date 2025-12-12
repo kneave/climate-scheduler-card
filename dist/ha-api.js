@@ -293,6 +293,13 @@ class HomeAssistantAPI {
         });
     }
     
+    async setIgnored(entityId, ignored) {
+        return await this.callService('climate_scheduler', 'set_ignored', {
+            entity_id: entityId,
+            ignored: ignored
+        });
+    }
+    
     // Group management methods
     async createGroup(groupName) {
         return await this.callService('climate_scheduler', 'create_group', {

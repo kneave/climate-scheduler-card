@@ -21,14 +21,22 @@ let scriptsLoaded = false;
 const loadScripts = () => {
     if (scriptsLoaded) return Promise.resolve();
     
-    const basePath = '/local/community/climate-scheduler-card';
+    // Use absolute URL to avoid path resolution issues when loaded in different contexts
+    const protocol = window.location.protocol;
+    const host = window.location.host;
+    const basePath = `${protocol}//${host}/local/community/climate-scheduler-card`;
+    const version = Date.now(); // Cache busting
+    
+    console.log('Loading Climate Scheduler scripts from:', basePath);
+    
     return Promise.all([
-        loadScript(`${basePath}/graph.js`),
-        loadScript(`${basePath}/ha-api.js`)
+        loadScript(`${basePath}/graph.js?v=${version}`),
+        loadScript(`${basePath}/ha-api.js?v=${version}`)
     ]).then(() => {
-        return loadScript(`${basePath}/app.js`);
+        return loadScript(`${basePath}/app.js?v=${version}`);
     }).then(() => {
         scriptsLoaded = true;
+        console.log('Climate Scheduler scripts loaded successfully');
     }).catch(error => {
         console.error('Failed to load Climate Scheduler scripts:', error);
         throw error;
@@ -100,10 +108,12 @@ class ClimateSchedulerPanel extends HTMLElement {
                 }
             }
 
-            // Load CSS into light DOM
+            // Load CSS into light DOM using absolute URL
+            const protocol = window.location.protocol;
+            const host = window.location.host;
             const styleLink = document.createElement('link');
             styleLink.rel = 'stylesheet';
-            styleLink.href = `/local/community/climate-scheduler-card/styles.css?v=${version}`;
+            styleLink.href = `${protocol}//${host}/local/community/climate-scheduler-card/styles.css?v=${version}`;
             this.appendChild(styleLink);
 
             // Create container div for content
