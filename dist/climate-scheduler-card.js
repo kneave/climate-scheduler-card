@@ -55,12 +55,8 @@ class ClimateSchedulerCard extends HTMLElement {
       return;
     }
 
-    // Check if climate_scheduler domain exists
-    const states = this._hass.states;
-    const hasIntegration = Object.keys(states).some(entity_id => 
-      entity_id.startsWith('climate.') && 
-      states[entity_id].attributes?.friendly_name?.includes('Climate')
-    );
+    // Check if climate_scheduler domain services exist
+    const hasIntegration = this._hass.services?.climate_scheduler !== undefined;
 
     if (!hasIntegration) {
       this._container.innerHTML = `
