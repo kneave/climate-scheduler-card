@@ -1023,6 +1023,7 @@ function createScheduleEditor() {
                 <button id="copy-schedule-btn" class="btn-secondary-outline schedule-btn" title="Copy current schedule">Copy Schedule</button>
                 <button id="paste-schedule-btn" class="btn-secondary-outline schedule-btn" title="Paste copied schedule" disabled>Paste Schedule</button>
                 <button id="advance-schedule-btn" class="btn-secondary-outline schedule-btn" title="Advance to next scheduled node">Advance</button>
+                <button id="clear-advance-history-btn" class="btn-secondary-outline schedule-btn" title="Clear advance history markers">Clear History</button>
                 <button id="ignore-entity-btn" class="btn-secondary-outline schedule-btn" title="Disable this thermostat">Ignore</button>
                 <button id="clear-schedule-btn" class="btn-danger-outline schedule-btn" title="Clear entire schedule">Clear Schedule</button>
                 <button id="save-schedule-btn" class="btn-primary schedule-btn" title="Save schedule">Save</button>
@@ -1367,14 +1368,18 @@ function attachEditorEventListeners(editorElement) {
                 if (isOverride) {
                     // Cancel advance
                     if (currentEntityId) {
+                        console.log('Cancelling advance for entity:', currentEntityId);
                         await haAPI.cancelAdvance(currentEntityId);
                         showToast('Advance canceled, returned to schedule', 'success');
                     } else if (currentGroup) {
                         // Cancel advance for all entities in group
                         const groupData = allGroups[currentGroup];
                         if (groupData && groupData.entities) {
+                            console.log('Cancelling advance for group entities:', groupData.entities);
                             for (const entityId of groupData.entities) {
-                                await haAPI.cancelAdvance(entityId);
+                                console.log('  Cancelling:', entityId);
+                                const result = await haAPI.cancelAdvance(entityId);
+                                console.log('  Result:', result);
                             }
                             showToast('Advance canceled for all entities in group', 'success');
                         }
@@ -1393,13 +1398,18 @@ function attachEditorEventListeners(editorElement) {
                 // Update button state after action
                 await updateAdvanceButton();
                 
+                // Small delay to ensure backend has updated
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
                 // Reload advance history to update graph
                 if (currentEntityId) {
+                    console.log('Reloading history for entity:', currentEntityId);
                     await loadAdvanceHistory(currentEntityId);
                 } else if (currentGroup) {
                     // For groups, reload history for first entity (since they share same schedule)
                     const groupData = allGroups[currentGroup];
                     if (groupData && groupData.entities && groupData.entities.length > 0) {
+                        console.log('Reloading history for first group entity:', groupData.entities[0]);
                         await loadAdvanceHistory(groupData.entities[0]);
                     }
                 }
@@ -1408,6 +1418,39 @@ function attachEditorEventListeners(editorElement) {
                 showToast('Failed: ' + error.message, 'error');
             } finally {
                 advanceBtn.disabled = false;
+            }
+        };
+    }
+    
+    // Clear advance history button
+    const clearHistoryBtn = editorElement.querySelector('#clear-advance-history-btn');
+    if (clearHistoryBtn) {
+        clearHistoryBtn.onclick = async () => {
+            clearHistoryBtn.disabled = true;
+            try {
+                if (currentEntityId) {
+                    await haAPI.clearAdvanceHistory(currentEntityId);
+                    await loadAdvanceHistory(currentEntityId);
+                    showToast('Advance history cleared', 'success');
+                } else if (currentGroup) {
+                    // Clear history for all entities in group
+                    const groupData = allGroups[currentGroup];
+                    if (groupData && groupData.entities) {
+                        for (const entityId of groupData.entities) {
+                            await haAPI.clearAdvanceHistory(entityId);
+                        }
+                        // Reload graph with first entity
+                        if (groupData.entities.length > 0) {
+                            await loadAdvanceHistory(groupData.entities[0]);
+                        }
+                        showToast('Advance history cleared for all entities in group', 'success');
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to clear advance history:', error);
+                showToast('Failed: ' + error.message, 'error');
+            } finally {
+                clearHistoryBtn.disabled = false;
             }
         };
     }

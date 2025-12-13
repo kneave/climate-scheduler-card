@@ -187,6 +187,39 @@ class TemperatureGraph {
         this.render();
     }
     
+    // Helper method to convert time string to minutes
+    timeToMinutes(timeStr) {
+        const [h, m] = timeStr.split(':').map(Number);
+        return h * 60 + m;
+    }
+    
+    // Interpolate temperature at a given time (step function - hold until next node)
+    interpolateTemperature(nodes, timeStr) {
+        if (nodes.length === 0) return 18;
+        
+        const sorted = [...nodes].sort((a, b) => this.timeToMinutes(a.time) - this.timeToMinutes(b.time));
+        const currentMinutes = this.timeToMinutes(timeStr);
+        
+        // Find the most recent node before or at current time
+        let activeNode = null;
+        
+        for (let i = 0; i < sorted.length; i++) {
+            const nodeMinutes = this.timeToMinutes(sorted[i].time);
+            if (nodeMinutes <= currentMinutes) {
+                activeNode = sorted[i];
+            } else {
+                break;
+            }
+        }
+        
+        // If no node found before current time, use last node (wrap around from previous day)
+        if (!activeNode) {
+            activeNode = sorted[sorted.length - 1];
+        }
+        
+        return activeNode.temp;
+    }
+    
     saveState() {
         // Save current state to undo stack (deep copy)
         this.undoStack.push(JSON.parse(JSON.stringify(this.nodes)));
@@ -550,7 +583,14 @@ class TemperatureGraph {
         const now = new Date();
         const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         
+        // Debug logging
+        console.log('Drawing advance markers, history:', this.advanceHistory);
+        
         this.advanceHistory.forEach(event => {
+            console.log('Processing event:', event);
+            console.log('  cancelled_at:', event.cancelled_at);
+            console.log('  target_time:', event.target_time);
+            
             const activatedTime = new Date(event.activated_at);
             const activatedMinutes = (activatedTime - todayMidnight) / (1000 * 60);
             
@@ -558,9 +598,13 @@ class TemperatureGraph {
             if (activatedMinutes >= 0 && activatedMinutes < 24 * 60) {
                 const activatedX = this.timeToX(`${String(activatedTime.getHours()).padStart(2, '0')}:${String(activatedTime.getMinutes()).padStart(2, '0')}`);
                 
-                // Draw activation marker (diamond)
+                // Get the target temperature from the target node
+                const targetTemp = event.target_node ? event.target_node.temp : null;
+                const markerY = targetTemp !== null ? this.tempToY(targetTemp) : this.padding.top;
+                
+                // Draw activation marker (diamond) at the target temperature level
                 const markerSize = 8;
-                const markerPath = `M ${activatedX},${this.padding.top - markerSize} L ${activatedX + markerSize},${this.padding.top} L ${activatedX},${this.padding.top + markerSize} L ${activatedX - markerSize},${this.padding.top} Z`;
+                const markerPath = `M ${activatedX},${markerY - markerSize} L ${activatedX + markerSize},${markerY} L ${activatedX},${markerY + markerSize} L ${activatedX - markerSize},${markerY} Z`;
                 const marker = this.createSVGElement('path', {
                     d: markerPath,
                     fill: '#00ff00',
@@ -573,17 +617,29 @@ class TemperatureGraph {
                 // Determine end point
                 let endX, endY, wasCancelled = false;
                 
-                if (event.cancelled_at) {
-                    // Cancelled - draw to cancellation time
+                // Check if this advance was cancelled
+                const isCancelled = !!(event.cancelled_at && 
+                                      event.cancelled_at !== 'null' && 
+                                      event.cancelled_at !== 'None');
+                
+                console.log('  isCancelled:', isCancelled);
+                
+                if (isCancelled) {
+                    // Cancelled - draw to cancellation time at the same advance temperature
                     const cancelledTime = new Date(event.cancelled_at);
                     const cancelledMinutes = (cancelledTime - todayMidnight) / (1000 * 60);
                     
+                    console.log('  Drawing cancelled line to:', event.cancelled_at);
+                    
                     if (cancelledMinutes >= 0 && cancelledMinutes < 24 * 60) {
-                        endX = this.timeToX(`${String(cancelledTime.getHours()).padStart(2, '0')}:${String(cancelledTime.getMinutes()).padStart(2, '0')}`);
-                        endY = this.padding.top + graphHeight + markerSize;
+                        const cancelledTimeStr = `${String(cancelledTime.getHours()).padStart(2, '0')}:${String(cancelledTime.getMinutes()).padStart(2, '0')}`;
+                        endX = this.timeToX(cancelledTimeStr);
+                        
+                        // Keep at the same temperature as the advance (horizontal line)
+                        endY = markerY;
                         wasCancelled = true;
                         
-                        // Draw cancellation marker (X)
+                        // Draw cancellation marker (X) at the advance temperature
                         const xSize = 6;
                         const cancelX = this.createSVGElement('path', {
                             d: `M ${endX - xSize},${endY - xSize} L ${endX + xSize},${endY + xSize} M ${endX + xSize},${endY - xSize} L ${endX - xSize},${endY + xSize}`,
@@ -594,17 +650,29 @@ class TemperatureGraph {
                         });
                         g.appendChild(cancelX);
                     }
-                } else if (event.target_time) {
-                    // Not cancelled - draw to target node time
-                    endX = this.timeToX(event.target_time);
-                    endY = this.padding.top + graphHeight + markerSize;
+                } else if (event.target_time && targetTemp !== null) {
+                    // Not cancelled - check if the advance is still active (current time hasn't passed target time)
+                    const currentMinutes = (now - todayMidnight) / (1000 * 60);
+                    const targetMinutes = this.timeToMinutes(event.target_time);
+                    
+                    console.log('  Current time (minutes):', currentMinutes);
+                    console.log('  Target time (minutes):', targetMinutes);
+                    
+                    // Only draw the line if the advance is still active (hasn't reached target time yet)
+                    if (currentMinutes < targetMinutes) {
+                        console.log('  Drawing active line to target_time:', event.target_time);
+                        endX = this.timeToX(event.target_time);
+                        endY = this.tempToY(targetTemp);
+                    } else {
+                        console.log('  Advance expired, not drawing line');
+                    }
                 }
                 
-                // Draw dotted line from activation to end point
+                // Draw dotted line connecting the activation point to the end point
                 if (endX !== undefined) {
                     const dottedLine = this.createSVGElement('line', {
                         x1: activatedX,
-                        y1: this.padding.top,
+                        y1: markerY,
                         x2: endX,
                         y2: endY,
                         stroke: wasCancelled ? '#ff6666' : '#66ff66',

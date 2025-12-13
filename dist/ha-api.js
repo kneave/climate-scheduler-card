@@ -317,6 +317,12 @@ class HomeAssistantAPI {
         }
     }
     
+    async clearAdvanceHistory(entityId) {
+        return await this.callService('climate_scheduler', 'clear_advance_history', {
+            entity_id: entityId
+        });
+    }
+    
     async cancelAdvance(entityId) {
         return await this.callService('climate_scheduler', 'cancel_advance', {
             entity_id: entityId
