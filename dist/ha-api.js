@@ -287,6 +287,54 @@ class HomeAssistantAPI {
         });
     }
     
+    async advanceSchedule(entityId) {
+        return await this.callService('climate_scheduler', 'advance_schedule', {
+            entity_id: entityId
+        });
+    }
+    
+    async advanceGroup(groupName) {
+        return await this.callService('climate_scheduler', 'advance_group', {
+            group_name: groupName
+        });
+    }
+    
+    async cancelAdvance(entityId) {
+        return await this.callService('climate_scheduler', 'cancel_advance', {
+            entity_id: entityId
+        });
+    }
+    
+    async getAdvanceStatus(entityId) {
+        try {
+            const result = await this.callService('climate_scheduler', 'get_advance_status', {
+                entity_id: entityId
+            }, true);
+            return result;
+        } catch (error) {
+            console.error('Failed to get advance status:', error);
+            return { is_active: false, history: [] };
+        }
+    }
+    
+    async cancelAdvance(entityId) {
+        return await this.callService('climate_scheduler', 'cancel_advance', {
+            entity_id: entityId
+        });
+    }
+    
+    async getOverrideStatus(entityId) {
+        try {
+            const result = await this.callService('climate_scheduler', 'get_override_status', {
+                entity_id: entityId
+            }, true);
+            return result;
+        } catch (error) {
+            console.error('Failed to get override status:', error);
+            return { has_override: false };
+        }
+    }
+    
     async clearSchedule(entityId) {
         return await this.callService('climate_scheduler', 'clear_schedule', {
             entity_id: entityId

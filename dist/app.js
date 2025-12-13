@@ -568,6 +568,11 @@ async function editGroupSchedule(groupName, day = null) {
     // Load history data for all entities in the group
     await loadGroupHistoryData(groupData.entities);
     
+    // Load advance history for the first entity in the group
+    if (groupData.entities && groupData.entities.length > 0) {
+        await loadAdvanceHistory(groupData.entities[0]);
+    }
+    
     // Set enabled state from saved group data
     const scheduleEnabled = editor.querySelector('#schedule-enabled');
     if (scheduleEnabled) {
@@ -1017,6 +1022,7 @@ function createScheduleEditor() {
                 <button id="undo-btn" class="btn-secondary-outline schedule-btn" title="Undo last change (Ctrl+Z)" disabled>Undo</button>
                 <button id="copy-schedule-btn" class="btn-secondary-outline schedule-btn" title="Copy current schedule">Copy Schedule</button>
                 <button id="paste-schedule-btn" class="btn-secondary-outline schedule-btn" title="Paste copied schedule" disabled>Paste Schedule</button>
+                <button id="advance-schedule-btn" class="btn-secondary-outline schedule-btn" title="Advance to next scheduled node">Advance</button>
                 <button id="ignore-entity-btn" class="btn-secondary-outline schedule-btn" title="Disable this thermostat">Ignore</button>
                 <button id="clear-schedule-btn" class="btn-danger-outline schedule-btn" title="Clear entire schedule">Clear Schedule</button>
                 <button id="save-schedule-btn" class="btn-primary schedule-btn" title="Save schedule">Save</button>
@@ -1258,6 +1264,9 @@ async function selectEntity(entityId) {
     // Load history data
     await loadHistoryData(entityId);
     
+    // Load advance history
+    await loadAdvanceHistory(entityId);
+    
     // Update entity status
     updateEntityStatus(entity);
     
@@ -1303,6 +1312,103 @@ function attachEditorEventListeners(editorElement) {
     if (pasteBtn) {
         pasteBtn.onclick = () => {
             pasteSchedule();
+        };
+    }
+    
+    // Advance schedule button
+    const advanceBtn = editorElement.querySelector('#advance-schedule-btn');
+    if (advanceBtn) {
+        // Function to update button state
+        const updateAdvanceButton = async () => {
+            if (currentEntityId) {
+                const status = await haAPI.getAdvanceStatus(currentEntityId);
+                if (status && status.is_active) {
+                    advanceBtn.textContent = 'Cancel Advance';
+                    advanceBtn.title = 'Cancel advance override and return to scheduled settings';
+                    advanceBtn.dataset.isOverride = 'true';
+                } else {
+                    advanceBtn.textContent = 'Advance';
+                    advanceBtn.title = 'Advance to next scheduled node';
+                    advanceBtn.dataset.isOverride = 'false';
+                }
+            } else if (currentGroup) {
+                // For groups, check if any entity has an active advance
+                const groupData = allGroups[currentGroup];
+                if (groupData && groupData.entities) {
+                    let anyActive = false;
+                    for (const entityId of groupData.entities) {
+                        const status = await haAPI.getAdvanceStatus(entityId);
+                        if (status && status.is_active) {
+                            anyActive = true;
+                            break;
+                        }
+                    }
+                    if (anyActive) {
+                        advanceBtn.textContent = 'Cancel Advance';
+                        advanceBtn.title = 'Cancel advance override for all entities in group';
+                        advanceBtn.dataset.isOverride = 'true';
+                    } else {
+                        advanceBtn.textContent = 'Advance';
+                        advanceBtn.title = 'Advance all entities in group to next scheduled node';
+                        advanceBtn.dataset.isOverride = 'false';
+                    }
+                }
+            }
+        };
+        
+        // Check initial state
+        updateAdvanceButton();
+        
+        advanceBtn.onclick = async () => {
+            advanceBtn.disabled = true;
+            try {
+                const isOverride = advanceBtn.dataset.isOverride === 'true';
+                
+                if (isOverride) {
+                    // Cancel advance
+                    if (currentEntityId) {
+                        await haAPI.cancelAdvance(currentEntityId);
+                        showToast('Advance canceled, returned to schedule', 'success');
+                    } else if (currentGroup) {
+                        // Cancel advance for all entities in group
+                        const groupData = allGroups[currentGroup];
+                        if (groupData && groupData.entities) {
+                            for (const entityId of groupData.entities) {
+                                await haAPI.cancelAdvance(entityId);
+                            }
+                            showToast('Advance canceled for all entities in group', 'success');
+                        }
+                    }
+                } else {
+                    // Advance to next
+                    if (currentEntityId) {
+                        await haAPI.advanceSchedule(currentEntityId);
+                        showToast('Advanced to next scheduled node', 'success');
+                    } else if (currentGroup) {
+                        await haAPI.advanceGroup(currentGroup);
+                        showToast(`Advanced all entities in group to next scheduled node`, 'success');
+                    }
+                }
+                
+                // Update button state after action
+                await updateAdvanceButton();
+                
+                // Reload advance history to update graph
+                if (currentEntityId) {
+                    await loadAdvanceHistory(currentEntityId);
+                } else if (currentGroup) {
+                    // For groups, reload history for first entity (since they share same schedule)
+                    const groupData = allGroups[currentGroup];
+                    if (groupData && groupData.entities && groupData.entities.length > 0) {
+                        await loadAdvanceHistory(groupData.entities[0]);
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to advance/cancel schedule:', error);
+                showToast('Failed: ' + error.message, 'error');
+            } finally {
+                advanceBtn.disabled = false;
+            }
         };
     }
     
@@ -4043,6 +4149,18 @@ function handleDefaultNodeSettings(event) {
     
     // Scroll to panel
     panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// Load advance history for an entity
+async function loadAdvanceHistory(entityId) {
+    try {
+        const status = await haAPI.getAdvanceStatus(entityId);
+        if (status && status.history && graph) {
+            graph.setAdvanceHistory(status.history);
+        }
+    } catch (error) {
+        console.error('Failed to load advance history:', error);
+    }
 }
 
 // Export initialization function for custom panel

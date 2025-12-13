@@ -8,6 +8,7 @@ class TemperatureGraph {
         this.svg = svgElement;
         this.nodes = [];
         this.historyData = []; // Array of {entityId, entityName, data: [{time, temp}], color}
+        this.advanceHistory = []; // Array of {activated_at, target_time, cancelled_at}
         this.draggingNode = null;
         this.draggingSegment = null; // {startIndex, endIndex, initialStartTime, initialEndTime, initialPointerMinutes}
         this.dragOffset = { x: 0, y: 0 };
@@ -179,6 +180,11 @@ class TemperatureGraph {
             // Re-render to pick up new scale
             this.render();
         }
+    }
+    
+    setAdvanceHistory(advanceHistory) {
+        this.advanceHistory = advanceHistory || [];
+        this.render();
     }
     
     saveState() {
@@ -425,6 +431,11 @@ class TemperatureGraph {
             this.drawHistoryLegend(g);
         }
         
+        // Draw advance markers and lines
+        if (this.advanceHistory && this.advanceHistory.length > 0) {
+            this.drawAdvanceMarkers(g);
+        }
+        
         // Draw temperature line
         if (this.nodes.length > 0) {
             this.drawTemperatureLine(g);
@@ -531,6 +542,79 @@ class TemperatureGraph {
             });
             text.textContent = entityHistory.entityName || entityHistory.entityId;
             g.appendChild(text);
+        });
+    }
+    
+    drawAdvanceMarkers(g) {
+        const graphHeight = this.height - this.padding.top - this.padding.bottom;
+        const now = new Date();
+        const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        
+        this.advanceHistory.forEach(event => {
+            const activatedTime = new Date(event.activated_at);
+            const activatedMinutes = (activatedTime - todayMidnight) / (1000 * 60);
+            
+            // Only draw if activated today
+            if (activatedMinutes >= 0 && activatedMinutes < 24 * 60) {
+                const activatedX = this.timeToX(`${String(activatedTime.getHours()).padStart(2, '0')}:${String(activatedTime.getMinutes()).padStart(2, '0')}`);
+                
+                // Draw activation marker (diamond)
+                const markerSize = 8;
+                const markerPath = `M ${activatedX},${this.padding.top - markerSize} L ${activatedX + markerSize},${this.padding.top} L ${activatedX},${this.padding.top + markerSize} L ${activatedX - markerSize},${this.padding.top} Z`;
+                const marker = this.createSVGElement('path', {
+                    d: markerPath,
+                    fill: '#00ff00',
+                    stroke: '#00aa00',
+                    'stroke-width': 2,
+                    opacity: 0.8
+                });
+                g.appendChild(marker);
+                
+                // Determine end point
+                let endX, endY, wasCancelled = false;
+                
+                if (event.cancelled_at) {
+                    // Cancelled - draw to cancellation time
+                    const cancelledTime = new Date(event.cancelled_at);
+                    const cancelledMinutes = (cancelledTime - todayMidnight) / (1000 * 60);
+                    
+                    if (cancelledMinutes >= 0 && cancelledMinutes < 24 * 60) {
+                        endX = this.timeToX(`${String(cancelledTime.getHours()).padStart(2, '0')}:${String(cancelledTime.getMinutes()).padStart(2, '0')}`);
+                        endY = this.padding.top + graphHeight + markerSize;
+                        wasCancelled = true;
+                        
+                        // Draw cancellation marker (X)
+                        const xSize = 6;
+                        const cancelX = this.createSVGElement('path', {
+                            d: `M ${endX - xSize},${endY - xSize} L ${endX + xSize},${endY + xSize} M ${endX + xSize},${endY - xSize} L ${endX - xSize},${endY + xSize}`,
+                            stroke: '#ff0000',
+                            'stroke-width': 3,
+                            'stroke-linecap': 'round',
+                            opacity: 0.8
+                        });
+                        g.appendChild(cancelX);
+                    }
+                } else if (event.target_time) {
+                    // Not cancelled - draw to target node time
+                    endX = this.timeToX(event.target_time);
+                    endY = this.padding.top + graphHeight + markerSize;
+                }
+                
+                // Draw dotted line from activation to end point
+                if (endX !== undefined) {
+                    const dottedLine = this.createSVGElement('line', {
+                        x1: activatedX,
+                        y1: this.padding.top,
+                        x2: endX,
+                        y2: endY,
+                        stroke: wasCancelled ? '#ff6666' : '#66ff66',
+                        'stroke-width': 2,
+                        'stroke-dasharray': '5,5',
+                        opacity: 0.6
+                    });
+                    g.appendChild(dottedLine);
+                }
+            }
         });
     }
     
