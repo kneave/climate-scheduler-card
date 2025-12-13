@@ -1254,12 +1254,150 @@ footer {
 }
 
 /* Group Members Table */
+.schedule-settings-container {
+    margin-bottom: 16px;
+}
+
+.schedule-settings-toggle {
+    background: var(--surface-light);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: background 0.2s;
+    user-select: none;
+}
+
+.schedule-settings-toggle:hover {
+    background: var(--surface);
+}
+
+.schedule-settings-toggle .toggle-icon {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    transition: transform 0.2s;
+    display: inline-block;
+}
+
+.schedule-settings-toggle .toggle-text {
+    color: var(--text-primary);
+    font-weight: 500;
+    font-size: 0.95rem;
+}
+
+.schedule-settings-panel {
+    background: var(--surface-light);
+    border-radius: 0 0 8px 8px;
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-top: none;
+    margin-top: -1px;
+}
+
+.schedule-settings-panel .editor-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 16px;
+    align-items: center;
+}
+
+.schedule-settings-panel .schedule-mode-selector {
+    margin-top: 0;
+}
+
+/* Instructions Container */
+.instructions-container {
+    margin-bottom: 16px;
+}
+
+.instructions-toggle {
+    background: var(--surface-light);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: background 0.2s;
+    user-select: none;
+}
+
+.instructions-toggle:hover {
+    background: var(--surface);
+}
+
+.instructions-toggle .toggle-icon {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    transition: transform 0.2s;
+    display: inline-block;
+}
+
+.instructions-toggle .toggle-text {
+    color: var(--text-primary);
+    font-weight: 500;
+    font-size: 0.95rem;
+}
+
+.graph-instructions.collapsed {
+    display: none;
+}
+
+.graph-instructions {
+    background: var(--surface-light);
+    border-radius: 0 0 8px 8px;
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-top: none;
+    margin-top: -1px;
+}
+
+.group-members-container {
+    margin-bottom: 16px;
+}
+
+.group-members-toggle {
+    background: var(--surface-light);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: background 0.2s;
+    user-select: none;
+}
+
+.group-members-toggle:hover {
+    background: var(--surface);
+}
+
+.group-members-toggle .toggle-icon {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    transition: transform 0.2s;
+    display: inline-block;
+}
+
+.group-members-toggle .toggle-text {
+    color: var(--text-primary);
+    font-weight: 500;
+    font-size: 0.95rem;
+}
+
 .group-members-table {
     background: var(--surface-light);
-    border-radius: 8px;
+    border-radius: 0 0 8px 8px;
     padding: 12px;
-    margin-bottom: 16px;
     border: 1px solid var(--border);
+    border-top: none;
+    margin-top: -1px;
 }
 
 .group-members-header {

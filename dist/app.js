@@ -304,7 +304,7 @@ function renderGroups() {
 // Create a group container element
 function createGroupContainer(groupName, groupData) {
     const container = document.createElement('div');
-    container.className = 'group-container';
+    container.className = 'group-container collapsed';
     container.dataset.groupName = groupName;
     
     // Create header
@@ -319,6 +319,7 @@ function createGroupContainer(groupName, groupData) {
     const toggleIcon = document.createElement('span');
     toggleIcon.className = 'group-toggle-icon';
     toggleIcon.textContent = '▼';
+    toggleIcon.style.transform = 'rotate(-90deg)';
     
     const title = document.createElement('span');
     title.className = 'group-title';
@@ -459,15 +460,6 @@ async function editGroupSchedule(groupName, day = null) {
         entityStatus.style.display = 'none';
     }
     
-    // Show group members table at the top of the editor
-    const editorHeader = editor.querySelector('.editor-header-inline');
-    if (editorHeader) {
-        const groupTable = createGroupMembersTable(groupData.entities);
-        if (groupTable) {
-            editorHeader.before(groupTable);
-        }
-    }
-    
     // Recreate graph with the new SVG element
     const svgElement = editor.querySelector('#temperature-graph');
     if (svgElement) {
@@ -478,14 +470,25 @@ async function editGroupSchedule(groupName, day = null) {
             graph.setMinMax(minTempSetting, maxTempSetting);
         }
         
-        // Connect undo button
-        const undoBtn = editor.querySelector('#undo-btn');
-        if (undoBtn) {
-            graph.setUndoButton(undoBtn);
-        }
-        
         // Attach graph event listeners (permanent listeners)
         svgElement.addEventListener('nodeSettings', handleNodeSettings);
+        
+        // Create and insert settings panel after the graph container but before instructions
+        const graphContainer = svgElement.closest('.graph-container') || svgElement.parentElement;
+        const instructionsContainer = editor.querySelector('.instructions-container');
+        
+        if (graphContainer && instructionsContainer) {
+            const settingsPanel = createSettingsPanel(groupData, editor);
+            if (settingsPanel) {
+                instructionsContainer.before(settingsPanel);
+            }
+            
+            // Insert group members table after instructions
+            const groupTable = createGroupMembersTable(groupData.entities);
+            if (groupTable) {
+                instructionsContainer.after(groupTable);
+            }
+        }
     }
     
     // Load nodes for the selected day
@@ -554,13 +557,148 @@ async function editGroupSchedule(groupName, day = null) {
     isLoadingSchedule = false;
 }
 
+// Create settings panel with controls and mode selector
+function createSettingsPanel(groupData, editor) {
+    const container = document.createElement('div');
+    container.className = 'schedule-settings-container';
+    
+    // Create toggle header
+    const toggleHeader = document.createElement('div');
+    toggleHeader.className = 'schedule-settings-toggle';
+    toggleHeader.innerHTML = `
+        <span class="toggle-icon">▼</span>
+        <span class="toggle-text">Schedule Settings</span>
+    `;
+    toggleHeader.style.cursor = 'pointer';
+    toggleHeader.style.userSelect = 'none';
+    
+    // Create settings panel content
+    const settingsPanel = document.createElement('div');
+    settingsPanel.className = 'schedule-settings-panel';
+    
+    // Add editor controls (buttons)
+    const controlsHTML = `
+        <div class="editor-controls">
+            <button id="undo-btn" class="btn-secondary-outline schedule-btn" title="Undo last change (Ctrl+Z)" disabled>Undo</button>
+            <button id="copy-schedule-btn" class="btn-secondary-outline schedule-btn" title="Copy current schedule">Copy Schedule</button>
+            <button id="paste-schedule-btn" class="btn-secondary-outline schedule-btn" title="Paste copied schedule" disabled>Paste Schedule</button>
+            <button id="advance-schedule-btn" class="btn-secondary-outline schedule-btn" title="Advance to next scheduled node">Advance</button>
+            <button id="clear-advance-history-btn" class="btn-secondary-outline schedule-btn" title="Clear advance history markers">Clear History</button>
+            <button id="ignore-entity-btn" class="btn-secondary-outline schedule-btn" title="Disable this thermostat">Ignore</button>
+            <button id="clear-schedule-btn" class="btn-danger-outline schedule-btn" title="Clear entire schedule">Clear Schedule</button>
+            <button id="save-schedule-btn" class="btn-primary schedule-btn" title="Save schedule">Save</button>
+            <label class="toggle-switch">
+                <input type="checkbox" id="schedule-enabled">
+                <span class="slider"></span>
+                <span class="toggle-label">Enabled</span>
+            </label>
+        </div>
+    `;
+    
+    // Add schedule mode selector
+    const modeSelectorHTML = `
+        <div class="schedule-mode-selector">
+            <h3>Schedule Mode</h3>
+            <div class="mode-options">
+                <div class="mode-option">
+                    <input type="radio" name="schedule-mode" value="all_days" id="mode-all-days" checked>
+                    <label for="mode-all-days">All Days</label>
+                </div>
+                <div class="mode-option">
+                    <input type="radio" name="schedule-mode" value="5/2" id="mode-5-2">
+                    <label for="mode-5-2">5/2 (Weekday/Weekend)</label>
+                </div>
+                <div class="mode-option">
+                    <input type="radio" name="schedule-mode" value="individual" id="mode-individual">
+                    <label for="mode-individual">Individual Days</label>
+                </div>
+            </div>
+            <div class="day-selector" id="day-selector">
+                <div class="day-buttons">
+                    <button class="day-btn" data-day="mon">Mon</button>
+                    <button class="day-btn" data-day="tue">Tue</button>
+                    <button class="day-btn" data-day="wed">Wed</button>
+                    <button class="day-btn" data-day="thu">Thu</button>
+                    <button class="day-btn" data-day="fri">Fri</button>
+                    <button class="day-btn" data-day="sat">Sat</button>
+                    <button class="day-btn" data-day="sun">Sun</button>
+                </div>
+            </div>
+            <div class="weekday-selector" id="weekday-selector">
+                <div class="day-buttons">
+                    <button class="day-btn weekday-btn" data-day="weekday">Weekday</button>
+                    <button class="day-btn weekday-btn" data-day="weekend">Weekend</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    settingsPanel.innerHTML = controlsHTML + modeSelectorHTML;
+    
+    // Toggle functionality
+    toggleHeader.onclick = () => {
+        const isCollapsed = settingsPanel.classList.contains('collapsed');
+        if (isCollapsed) {
+            settingsPanel.classList.remove('collapsed');
+            settingsPanel.style.display = 'block';
+            toggleHeader.querySelector('.toggle-icon').style.transform = 'rotate(0deg)';
+        } else {
+            settingsPanel.classList.add('collapsed');
+            settingsPanel.style.display = 'none';
+            toggleHeader.querySelector('.toggle-icon').style.transform = 'rotate(-90deg)';
+        }
+    };
+    
+    container.appendChild(toggleHeader);
+    container.appendChild(settingsPanel);
+    
+    // Connect undo button to graph
+    setTimeout(() => {
+        const undoBtn = container.querySelector('#undo-btn');
+        if (undoBtn && graph) {
+            graph.setUndoButton(undoBtn);
+        }
+    }, 0);
+    
+    return container;
+}
+
 // Create group members table element
 function createGroupMembersTable(entityIds) {
     if (!entityIds || entityIds.length === 0) return null;
     
+    // Create container wrapper
+    const container = document.createElement('div');
+    container.className = 'group-members-container';
+    
+    // Create toggle header
+    const toggleHeader = document.createElement('div');
+    toggleHeader.className = 'group-members-toggle';
+    toggleHeader.innerHTML = `
+        <span class="toggle-icon">▶</span>
+        <span class="toggle-text">Member Entities (${entityIds.length})</span>
+    `;
+    toggleHeader.style.cursor = 'pointer';
+    toggleHeader.style.userSelect = 'none';
+    
     // Create table
     const table = document.createElement('div');
-    table.className = 'group-members-table';
+    table.className = 'group-members-table collapsed';
+    table.style.display = 'none';
+    
+    // Toggle functionality
+    toggleHeader.onclick = () => {
+        const isCollapsed = table.classList.contains('collapsed');
+        if (isCollapsed) {
+            table.classList.remove('collapsed');
+            table.style.display = 'block';
+            toggleHeader.querySelector('.toggle-icon').style.transform = 'rotate(90deg)';
+        } else {
+            table.classList.add('collapsed');
+            table.style.display = 'none';
+            toggleHeader.querySelector('.toggle-icon').style.transform = 'rotate(0deg)';
+        }
+    };
     
     // Create header
     const header = document.createElement('div');
@@ -628,7 +766,10 @@ function createGroupMembersTable(entityIds) {
         table.appendChild(row);
     });
     
-    return table;
+    container.appendChild(toggleHeader);
+    container.appendChild(table);
+    
+    return container;
 }
 
 // Display group members table above graph (deprecated - use createGroupMembersTable instead)
@@ -1004,21 +1145,6 @@ function createScheduleEditor() {
     editor.className = 'schedule-editor-inline';
     editor.innerHTML = `
         <div class="editor-header-inline">
-            <div class="editor-controls">
-                <button id="undo-btn" class="btn-secondary-outline schedule-btn" title="Undo last change (Ctrl+Z)" disabled>Undo</button>
-                <button id="copy-schedule-btn" class="btn-secondary-outline schedule-btn" title="Copy current schedule">Copy Schedule</button>
-                <button id="paste-schedule-btn" class="btn-secondary-outline schedule-btn" title="Paste copied schedule" disabled>Paste Schedule</button>
-                <button id="advance-schedule-btn" class="btn-secondary-outline schedule-btn" title="Advance to next scheduled node">Advance</button>
-                <button id="clear-advance-history-btn" class="btn-secondary-outline schedule-btn" title="Clear advance history markers">Clear History</button>
-                <button id="ignore-entity-btn" class="btn-secondary-outline schedule-btn" title="Disable this thermostat">Ignore</button>
-                <button id="clear-schedule-btn" class="btn-danger-outline schedule-btn" title="Clear entire schedule">Clear Schedule</button>
-                <button id="save-schedule-btn" class="btn-primary schedule-btn" title="Save schedule">Save</button>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="schedule-enabled">
-                    <span class="slider"></span>
-                    <span class="toggle-label">Enabled</span>
-                </label>
-            </div>
         </div>
 
         <div class="entity-status">
@@ -1049,42 +1175,6 @@ function createScheduleEditor() {
             <div class="status-item" id="current-preset-mode-item" style="display: none;">
                 <span class="status-label">Preset Mode:</span>
                 <span id="current-preset-mode" class="status-value">--</span>
-            </div>
-        </div>
-
-        <!-- Schedule Mode and Day Selector -->
-        <div class="schedule-mode-selector">
-            <h3>Schedule Mode</h3>
-            <div class="mode-options">
-                <div class="mode-option">
-                    <input type="radio" name="schedule-mode" value="all_days" id="mode-all-days" checked>
-                    <label for="mode-all-days">All Days</label>
-                </div>
-                <div class="mode-option">
-                    <input type="radio" name="schedule-mode" value="5/2" id="mode-5-2">
-                    <label for="mode-5-2">5/2 (Weekday/Weekend)</label>
-                </div>
-                <div class="mode-option">
-                    <input type="radio" name="schedule-mode" value="individual" id="mode-individual">
-                    <label for="mode-individual">Individual Days</label>
-                </div>
-            </div>
-            <div class="day-selector" id="day-selector">
-                <div class="day-buttons">
-                    <button class="day-btn" data-day="mon">Mon</button>
-                    <button class="day-btn" data-day="tue">Tue</button>
-                    <button class="day-btn" data-day="wed">Wed</button>
-                    <button class="day-btn" data-day="thu">Thu</button>
-                    <button class="day-btn" data-day="fri">Fri</button>
-                    <button class="day-btn" data-day="sat">Sat</button>
-                    <button class="day-btn" data-day="sun">Sun</button>
-                </div>
-            </div>
-            <div class="weekday-selector" id="weekday-selector">
-                <div class="day-buttons">
-                    <button class="day-btn weekday-btn" data-day="weekday">Weekday</button>
-                    <button class="day-btn weekday-btn" data-day="weekend">Weekend</button>
-                </div>
             </div>
         </div>
 
@@ -1151,7 +1241,15 @@ function createScheduleEditor() {
                     </div>
                 </div>
             </div>
-            <div class="graph-instructions">
+        </div>
+        
+        <!-- Instructions Section (Collapsible) -->
+        <div class="instructions-container">
+            <div class="instructions-toggle">
+                <span class="toggle-icon">▶</span>
+                <span class="toggle-text">Instructions</span>
+            </div>
+            <div class="graph-instructions collapsed" style="display: none;">
                 <p>📍 <strong>Double-click or double-tap</strong> the line to add a new node</p>
                 <p>👆 <strong>Drag nodes</strong> vertically to change temperature or horizontally to move their time</p>
                 <p>⬌ <strong>Drag the horizontal segment</strong> between two nodes to shift that period while preserving its duration</p>
@@ -1266,6 +1364,24 @@ async function selectEntity(entityId) {
 
 // Attach event listeners to editor elements (for dynamically created editors)
 function attachEditorEventListeners(editorElement) {
+    
+    // Instructions toggle
+    const instructionsToggle = editorElement.querySelector('.instructions-toggle');
+    const instructionsContent = editorElement.querySelector('.graph-instructions');
+    if (instructionsToggle && instructionsContent) {
+        instructionsToggle.onclick = () => {
+            const isCollapsed = instructionsContent.classList.contains('collapsed');
+            if (isCollapsed) {
+                instructionsContent.classList.remove('collapsed');
+                instructionsContent.style.display = 'block';
+                instructionsToggle.querySelector('.toggle-icon').style.transform = 'rotate(90deg)';
+            } else {
+                instructionsContent.classList.add('collapsed');
+                instructionsContent.style.display = 'none';
+                instructionsToggle.querySelector('.toggle-icon').style.transform = 'rotate(0deg)';
+            }
+        };
+    }
     
     // Ignore button
     const ignoreBtn = editorElement.querySelector('#ignore-entity-btn');
