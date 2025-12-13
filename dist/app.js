@@ -382,21 +382,6 @@ function createGroupContainer(groupName, groupData) {
     header.appendChild(leftSide);
     header.appendChild(actions);
     
-    // Create entities container
-    const entitiesContainer = document.createElement('div');
-    entitiesContainer.className = 'group-entities';
-    
-    if (groupData.entities && groupData.entities.length > 0) {
-        groupData.entities.forEach(entityId => {
-            const entityCard = createGroupEntityCard(entityId, groupName);
-            if (entityCard) {
-                entitiesContainer.appendChild(entityCard);
-            }
-        });
-    } else {
-        entitiesContainer.innerHTML = '<p style="color: var(--secondary-text-color); padding: 8px;">No entities in this group</p>';
-    }
-    
     // Toggle collapse/expand and edit schedule on header click
     header.onclick = (e) => {
         // Don't trigger if clicking on action buttons
@@ -420,32 +405,9 @@ function createGroupContainer(groupName, groupData) {
     };
     
     container.appendChild(header);
-    container.appendChild(entitiesContainer);
     
     return container;
-}function createGroupEntityCard(entityId, groupName) {
-    const entity = climateEntities.find(e => e.entity_id === entityId);
-    if (!entity) return null;
-    
-    const card = document.createElement('div');
-    card.className = 'entity-card';
-    card.dataset.entityId = entityId;
-    
-    const name = document.createElement('span');
-    name.textContent = entity.attributes?.friendly_name || entityId;
-    
-    const removeBtn = document.createElement('button');
-    removeBtn.textContent = 'Remove';
-    removeBtn.style.marginLeft = 'auto';
-    removeBtn.onclick = () => removeEntityFromGroup(groupName, entityId);
-    
-    card.appendChild(name);
-    card.appendChild(removeBtn);
-    
-    return card;
-}
-
-// Edit group schedule - load group schedule into editor
+}// Edit group schedule - load group schedule into editor
 async function editGroupSchedule(groupName, day = null) {
     const groupData = allGroups[groupName];
     if (!groupData) return;
@@ -603,7 +565,7 @@ function createGroupMembersTable(entityIds) {
     // Create header
     const header = document.createElement('div');
     header.className = 'group-members-header';
-    header.innerHTML = '<span>Name</span><span>Current</span><span>Target</span><span>Scheduled</span>';
+    header.innerHTML = '<span>Name</span><span>Current</span><span>Target</span><span>Scheduled</span><span style="text-align: center;">Remove</span>';
     table.appendChild(header);
     
     // Get current time for scheduled temp calculation
@@ -641,10 +603,28 @@ function createGroupMembersTable(entityIds) {
             scheduledCell.textContent = '--';
         }
         
+        // Add remove button cell
+        const removeCell = document.createElement('span');
+        removeCell.style.textAlign = 'center';
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'btn-icon-small remove-entity-btn';
+        removeBtn.innerHTML = '✕';
+        removeBtn.title = 'Remove from group';
+        removeBtn.onclick = (e) => {
+            e.stopPropagation();
+            // Get the group name from the current context
+            const groupName = currentGroup;
+            if (groupName) {
+                removeEntityFromGroup(groupName, entityId);
+            }
+        };
+        removeCell.appendChild(removeBtn);
+        
         row.appendChild(nameCell);
         row.appendChild(currentCell);
         row.appendChild(targetCell);
         row.appendChild(scheduledCell);
+        row.appendChild(removeCell);
         table.appendChild(row);
     });
     
@@ -728,7 +708,13 @@ async function toggleEntityInclusion(entityId, enable = true) {
 
 // Remove entity from group
 async function removeEntityFromGroup(groupName, entityId) {
-    if (!confirm(`Remove entity from group "${groupName}"?`)) return;
+    // Get entity name for confirmation
+    const entity = climateEntities.find(e => e.entity_id === entityId);
+    const entityName = entity?.attributes?.friendly_name || entityId;
+    
+    if (!confirm(`Remove "${entityName}" from group "${groupName}"?\n\nThe entity will return to your active entities list.`)) {
+        return;
+    }
     
     try {
         await haAPI.removeFromGroup(groupName, entityId);
@@ -739,10 +725,10 @@ async function removeEntityFromGroup(groupName, entityId) {
         // Reload entity list (entity should reappear in active/disabled)
         await renderEntityList();
         
-        // Entity removed from group
+        showToast(`Removed ${entityName} from ${groupName}`, 'success');
     } catch (error) {
         console.error('Failed to remove entity from group:', error);
-        alert('Failed to remove entity from group');
+        showToast('Failed to remove entity from group: ' + error.message, 'error');
     }
 }
 

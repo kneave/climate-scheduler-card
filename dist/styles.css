@@ -1264,7 +1264,7 @@ footer {
 
 .group-members-header {
     display: grid;
-    grid-template-columns: 1fr auto auto auto;
+    grid-template-columns: 1fr auto auto auto auto;
     gap: 12px;
     padding: 8px 12px;
     font-weight: 600;
@@ -1282,9 +1282,14 @@ footer {
     text-align: right;
 }
 
+.group-members-header span:nth-child(5) {
+    width: 60px;
+    text-align: center;
+}
+
 .group-members-row {
     display: grid;
-    grid-template-columns: 1fr auto auto auto;
+    grid-template-columns: 1fr auto auto auto auto;
     gap: 12px;
     padding: 10px 12px;
     border-radius: 6px;
@@ -1309,6 +1314,11 @@ footer {
     color: var(--text-primary);
 }
 
+.group-members-row span:nth-child(5) {
+    width: 60px;
+    text-align: center;
+}
+
 .group-members-row span:nth-child(2) {
     color: var(--accent-color);
 }
@@ -1316,6 +1326,38 @@ footer {
 .group-members-row span:nth-child(3) {
     color: var(--primary-color);
     font-weight: 600;
+}
+
+/* Remove button in group members table */
+.btn-icon-small {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    height: 28px;
+}
+
+.btn-icon-small:hover {
+    background: var(--danger);
+    border-color: var(--danger);
+    color: white;
+    transform: scale(1.1);
+}
+
+.btn-icon-small:active {
+    transform: scale(0.95);
+}
+
+.remove-entity-btn {
+    font-weight: bold;
 }
 
 /* Inline Schedule Editor */
