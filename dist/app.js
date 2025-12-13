@@ -333,55 +333,7 @@ function createGroupContainer(groupName, groupData) {
     leftSide.appendChild(title);
     leftSide.appendChild(count);
     
-    // Create action buttons
-    const actions = document.createElement('div');
-    actions.className = 'group-actions';
-    
-    // Add enabled toggle
-    const toggleContainer = document.createElement('label');
-    toggleContainer.className = 'toggle-switch';
-    toggleContainer.style.marginRight = '12px';
-    toggleContainer.onclick = (e) => e.stopPropagation();
-    
-    const toggleInput = document.createElement('input');
-    toggleInput.type = 'checkbox';
-    toggleInput.checked = groupData.enabled !== false;
-    toggleInput.onchange = async (e) => {
-        e.stopPropagation();
-        await toggleGroupEnabled(groupName, toggleInput.checked);
-    };
-    
-    const toggleSlider = document.createElement('span');
-    toggleSlider.className = 'slider';
-    
-    toggleContainer.appendChild(toggleInput);
-    toggleContainer.appendChild(toggleSlider);
-    
-    const editBtn = document.createElement('button');
-    editBtn.textContent = 'Edit Schedule';
-    editBtn.onclick = (e) => {
-        e.stopPropagation();
-        // Toggle edit - if already editing this group, collapse; otherwise expand
-        if (currentGroup === groupName && container.classList.contains('expanded')) {
-            collapseAllEditors();
-            currentGroup = null;
-        } else {
-            editGroupSchedule(groupName);
-        }
-    };
-    
-    const deleteBtn = document.createElement('button');
-    deleteBtn.textContent = 'Delete Group';
-    deleteBtn.onclick = (e) => {
-        e.stopPropagation();
-        confirmDeleteGroup(groupName);
-    };
-    
-    actions.appendChild(editBtn);
-    actions.appendChild(deleteBtn);
-    
     header.appendChild(leftSide);
-    header.appendChild(actions);
     
     // Toggle collapse/expand and edit schedule on header click
     header.onclick = (e) => {
@@ -566,7 +518,7 @@ function createSettingsPanel(groupData, editor) {
     const toggleHeader = document.createElement('div');
     toggleHeader.className = 'schedule-settings-toggle';
     toggleHeader.innerHTML = `
-        <span class="toggle-icon">▼</span>
+        <span class="toggle-icon">▶</span>
         <span class="toggle-text">Schedule Settings</span>
     `;
     toggleHeader.style.cursor = 'pointer';
@@ -574,19 +526,27 @@ function createSettingsPanel(groupData, editor) {
     
     // Create settings panel content
     const settingsPanel = document.createElement('div');
-    settingsPanel.className = 'schedule-settings-panel';
+    settingsPanel.className = 'schedule-settings-panel collapsed';
+    settingsPanel.style.display = 'none';
     
     // Add editor controls (buttons)
-    const controlsHTML = `
+    let controlsHTML = `
         <div class="editor-controls">
             <button id="undo-btn" class="btn-secondary-outline schedule-btn" title="Undo last change (Ctrl+Z)" disabled>Undo</button>
             <button id="copy-schedule-btn" class="btn-secondary-outline schedule-btn" title="Copy current schedule">Copy Schedule</button>
             <button id="paste-schedule-btn" class="btn-secondary-outline schedule-btn" title="Paste copied schedule" disabled>Paste Schedule</button>
             <button id="advance-schedule-btn" class="btn-secondary-outline schedule-btn" title="Advance to next scheduled node">Advance</button>
-            <button id="clear-advance-history-btn" class="btn-secondary-outline schedule-btn" title="Clear advance history markers">Clear History</button>
+            <button id="clear-advance-history-btn" class="btn-secondary-outline schedule-btn" title="Clear advance history markers">Clear Advance History</button>
             <button id="ignore-entity-btn" class="btn-secondary-outline schedule-btn" title="Disable this thermostat">Ignore</button>
             <button id="clear-schedule-btn" class="btn-danger-outline schedule-btn" title="Clear entire schedule">Clear Schedule</button>
-            <button id="save-schedule-btn" class="btn-primary schedule-btn" title="Save schedule">Save</button>
+            <button id="save-schedule-btn" class="btn-primary schedule-btn" title="Save schedule">Save</button>`;
+    
+    // Add delete group button if this is a group
+    if (groupData) {
+        controlsHTML += `<button id="delete-group-btn" class="btn-danger schedule-btn" title="Delete this group">Delete Group</button>`;
+    }
+    
+    controlsHTML += `
             <label class="toggle-switch">
                 <input type="checkbox" id="schedule-enabled">
                 <span class="slider"></span>
@@ -652,11 +612,25 @@ function createSettingsPanel(groupData, editor) {
     container.appendChild(toggleHeader);
     container.appendChild(settingsPanel);
     
-    // Connect undo button to graph
+    // Connect undo button to graph and add delete group handler
     setTimeout(() => {
         const undoBtn = container.querySelector('#undo-btn');
         if (undoBtn && graph) {
             graph.setUndoButton(undoBtn);
+        }
+        
+        // Add delete group button handler if this is a group
+        if (groupData) {
+            const deleteGroupBtn = container.querySelector('#delete-group-btn');
+            if (deleteGroupBtn) {
+                deleteGroupBtn.onclick = () => {
+                    // Get group name from currentGroup or from groupData
+                    const groupName = currentGroup;
+                    if (groupName) {
+                        confirmDeleteGroup(groupName);
+                    }
+                };
+            }
         }
     }, 0);
     
@@ -1130,9 +1104,23 @@ function createEntityCard(entity, isIncluded = false) {
             // Collapse
             collapseAllEditors();
             currentEntityId = null;
+            
+            // Reset add to group button text to "+"
+            const addToGroupBtn = card.querySelector('.add-to-group-btn');
+            if (addToGroupBtn) {
+                addToGroupBtn.textContent = '+';
+                addToGroupBtn.style.padding = '4px 8px';
+            }
         } else {
             // Expand with editor
             selectEntity(entity.entity_id);
+            
+            // Change add to group button text to "Add to Group"
+            const addToGroupBtn = card.querySelector('.add-to-group-btn');
+            if (addToGroupBtn) {
+                addToGroupBtn.textContent = 'Add to Group';
+                addToGroupBtn.style.padding = '6px 12px';
+            }
         }
     });
     
@@ -1271,7 +1259,16 @@ function collapseAllEditors() {
     allCloseButtons.forEach(btn => btn.remove());
     
     const allCards = getDocumentRoot().querySelectorAll('.entity-card');
-    allCards.forEach(card => card.classList.remove('selected', 'expanded'));
+    allCards.forEach(card => {
+        card.classList.remove('selected', 'expanded');
+        
+        // Reset add to group button text to "+"
+        const addToGroupBtn = card.querySelector('.add-to-group-btn');
+        if (addToGroupBtn) {
+            addToGroupBtn.textContent = '+';
+            addToGroupBtn.style.padding = '4px 8px';
+        }
+    });
     
     const allGroupContainers = getDocumentRoot().querySelectorAll('.group-container');
     allGroupContainers.forEach(container => container.classList.remove('expanded'));
@@ -1331,16 +1328,21 @@ async function selectEntity(entityId) {
             graph.setMinMax(minTempSetting, maxTempSetting);
         }
         
-        // Connect undo button
-        const undoBtn = editor.querySelector('#undo-btn');
-        if (undoBtn) {
-            graph.setUndoButton(undoBtn);
-        }
-        
         // Always attach the permanent nodesChanged listener for auto-save
         svgElement.removeEventListener('nodesChanged', handleGraphChange); // Remove any previous
         svgElement.addEventListener('nodesChanged', handleGraphChange);
         svgElement.addEventListener('nodeSettings', handleNodeSettings);
+        
+        // Create and insert settings panel after the graph container but before instructions
+        const graphContainer = svgElement.closest('.graph-container') || svgElement.parentElement;
+        const instructionsContainer = editor.querySelector('.instructions-container');
+        
+        if (graphContainer && instructionsContainer) {
+            const settingsPanel = createSettingsPanel(null, editor);
+            if (settingsPanel) {
+                instructionsContainer.before(settingsPanel);
+            }
+        }
     }
     
     // Load schedule

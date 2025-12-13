@@ -204,9 +204,9 @@ climate-scheduler-panel {
 
 /* Groups Section */
 .groups-section {
-    margin-top: 20px;
-    padding-top: 20px;
-    border-top: 1px solid var(--border);
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
 }
 
 .groups-list {
@@ -1255,6 +1255,7 @@ footer {
 
 /* Group Members Table */
 .schedule-settings-container {
+    margin-top: 12px;
     margin-bottom: 16px;
 }
 

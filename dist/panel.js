@@ -121,26 +121,6 @@ class ClimateSchedulerPanel extends HTMLElement {
             container.innerHTML = `
                 <div class="container">
                     <section class="entity-selector">
-                        <div class="selector-header">
-                            <h2>Climate Entities</h2>
-                            <button id="menu-button" class="btn-icon" title="Menu">⋮</button>
-                        </div>
-                        
-                        <div id="dropdown-menu" class="dropdown-menu" style="display: none;">
-                            <button id="refresh-entities-menu" class="menu-item">
-                                <span class="menu-icon">↻</span>
-                                <span>Refresh Entities</span>
-                            </button>
-                            <button id="sync-all-menu" class="menu-item">
-                                <span class="menu-icon">⟲</span>
-                                <span>Sync All Thermostats</span>
-                            </button>
-                            <button id="reload-integration-menu" class="menu-item">
-                                <span class="menu-icon">🔄</span>
-                                <span>Reload Integration (Dev)</span>
-                            </button>
-                        </div>
-                        
                         <div class="groups-section">
                             <h3 class="section-title">Groups (<span id="groups-count">0</span>)</h3>
                             <div id="groups-list" class="groups-list">
@@ -354,7 +334,10 @@ class ClimateSchedulerPanel extends HTMLElement {
                                 <!-- right column removed: min/max now inline in Graph Options -->
                             </div>
 
-                            <div class="settings-actions" style="margin-top: 12px; display: flex; gap: 12px;">
+                            <div class="settings-actions" style="margin-top: 12px; display: flex; gap: 12px; flex-wrap: wrap;">
+                                <button id="refresh-entities-menu" class="btn-secondary">↻ Refresh Entities</button>
+                                <button id="sync-all-menu" class="btn-secondary">⟲ Sync All Thermostats</button>
+                                <button id="reload-integration-menu" class="btn-secondary">🔄 Reload Integration (Dev)</button>
                                 <button id="convert-temperature-btn" class="btn-secondary">Convert All Schedules...</button>
                                 <button id="reset-defaults" class="btn-secondary">Reset to Defaults</button>
                             </div>
