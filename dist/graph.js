@@ -143,9 +143,38 @@ class TemperatureGraph {
     }
     
     getThemeColor(varName) {
-        // Get CSS variable value from computed styles
-        const rootStyles = getComputedStyle(document.documentElement);
-        return rootStyles.getPropertyValue(varName).trim() || '#ffffff';
+        // Try to get CSS variable from multiple sources
+        // First try the SVG element itself, then panel, then document root
+        let value = '';
+        
+        if (this.svg && this.svg.parentElement) {
+            value = getComputedStyle(this.svg.parentElement).getPropertyValue(varName).trim();
+        }
+        
+        if (!value) {
+            const panel = document.querySelector('climate-scheduler-panel');
+            if (panel) {
+                value = getComputedStyle(panel).getPropertyValue(varName).trim();
+            }
+        }
+        
+        if (!value) {
+            value = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+        }
+        
+        // Fallback to dark theme colors if still nothing
+        if (!value) {
+            const darkThemeDefaults = {
+                '--surface': '#2d2d2d',
+                '--text-primary': '#ffffff',
+                '--text-secondary': '#b0b0b0',
+                '--accent': '#ff9800',
+                '--background': '#1e1e1e'
+            };
+            value = darkThemeDefaults[varName] || '#ffffff';
+        }
+        
+        return value;
     }
     
     setUndoButton(buttonElement) {
@@ -292,6 +321,11 @@ class TemperatureGraph {
         const text = this.tooltip.querySelector('.tooltip-text');
         const bg = this.tooltip.querySelector('rect');
         
+        // Update tooltip colors to match current theme
+        bg.setAttribute('fill', this.getThemeColor('--surface'));
+        bg.setAttribute('stroke', this.getThemeColor('--accent'));
+        text.setAttribute('fill', this.getThemeColor('--text-primary'));
+        
         // Show hover line
         const graphTop = this.padding.top;
         const graphBottom = this.height - this.padding.bottom;
@@ -380,6 +414,11 @@ class TemperatureGraph {
     showCursorTooltip(mouseX, mouseY, timeStr, temp) {
         const text = this.tooltip.querySelector('.tooltip-text');
         const bg = this.tooltip.querySelector('rect');
+        
+        // Update tooltip colors to match current theme
+        bg.setAttribute('fill', this.getThemeColor('--surface'));
+        bg.setAttribute('stroke', this.getThemeColor('--accent'));
+        text.setAttribute('fill', this.getThemeColor('--text-primary'));
         
         // Clear existing content
         text.textContent = '';
