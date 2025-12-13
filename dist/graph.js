@@ -81,8 +81,8 @@ class TemperatureGraph {
             width: 100,
             height: 40,
             rx: 5,
-            fill: '#1a1a1a',
-            stroke: '#ff9800',
+            fill: this.getThemeColor('--surface'),
+            stroke: this.getThemeColor('--accent'),
             'stroke-width': 2,
             opacity: 0.95
         });
@@ -91,7 +91,7 @@ class TemperatureGraph {
             x: 50,
             y: 25,
             'text-anchor': 'middle',
-            fill: '#fff',
+            fill: this.getThemeColor('--text-primary'),
             'font-size': '14',
             'font-weight': 'bold',
             class: 'tooltip-text'
@@ -104,7 +104,7 @@ class TemperatureGraph {
         // Create hover line and time label
         this.hoverLine = this.createSVGElement('line', {
             class: 'hover-line',
-            stroke: '#ff9800',
+            stroke: this.getThemeColor('--accent'),
             'stroke-width': 1,
             'stroke-dasharray': '5,5',
             opacity: 0.7,
@@ -123,7 +123,7 @@ class TemperatureGraph {
             width: 60,
             height: 24,
             rx: 3,
-            fill: '#ff9800',
+            fill: this.getThemeColor('--accent'),
             opacity: 0.9
         });
         
@@ -131,7 +131,7 @@ class TemperatureGraph {
             x: 30,
             y: 16,
             'text-anchor': 'middle',
-            fill: '#1a1a1a',
+            fill: this.getThemeColor('--background'),
             'font-size': '12',
             'font-weight': 'bold',
             class: 'time-label-text'
@@ -140,6 +140,12 @@ class TemperatureGraph {
         this.hoverTimeLabel.appendChild(labelBg);
         this.hoverTimeLabel.appendChild(labelText);
         this.svg.appendChild(this.hoverTimeLabel);
+    }
+    
+    getThemeColor(varName) {
+        // Get CSS variable value from computed styles
+        const rootStyles = getComputedStyle(document.documentElement);
+        return rootStyles.getPropertyValue(varName).trim() || '#ffffff';
     }
     
     setUndoButton(buttonElement) {
@@ -570,7 +576,7 @@ class TemperatureGraph {
             const text = this.createSVGElement('text', {
                 x: legendX + 25,
                 y: y + 4,
-                fill: '#b0b0b0',
+                fill: this.getThemeColor('--text-secondary'),
                 'font-size': '12'
             });
             text.textContent = entityHistory.entityName || entityHistory.entityId;
@@ -716,7 +722,7 @@ class TemperatureGraph {
                     x: x,
                     y: this.padding.top + graphHeight + 20,
                     'text-anchor': 'middle',
-                    fill: '#b0b0b0',
+                    fill: this.getThemeColor('--text-secondary'),
                     'font-size': minutes === 0 ? '12' : '10'
                 });
                 
@@ -753,7 +759,7 @@ class TemperatureGraph {
                 x: this.padding.left - 10,
                 y: y + 4,
                 'text-anchor': 'end',
-                fill: '#b0b0b0',
+                fill: this.getThemeColor('--text-secondary'),
                 'font-size': '12'
             });
             const unit = (typeof temperatureUnit !== 'undefined') ? temperatureUnit : '°C';
@@ -772,7 +778,7 @@ class TemperatureGraph {
             y1: this.padding.top + graphHeight,
             x2: this.padding.left + graphWidth,
             y2: this.padding.top + graphHeight,
-            stroke: '#fff',
+            stroke: this.getThemeColor('--text-primary'),
             'stroke-width': 2
         });
         g.appendChild(xAxis);
@@ -783,7 +789,7 @@ class TemperatureGraph {
             y1: this.padding.top,
             x2: this.padding.left,
             y2: this.padding.top + graphHeight,
-            stroke: '#fff',
+            stroke: this.getThemeColor('--text-primary'),
             'stroke-width': 2
         });
         g.appendChild(yAxis);
@@ -823,7 +829,7 @@ class TemperatureGraph {
             x: this.padding.left + graphWidth / 2,
             y: this.height - 10,
             'text-anchor': 'middle',
-            fill: '#fff',
+            fill: this.getThemeColor('--text-primary'),
             'font-size': '14',
             'font-weight': 'bold'
         });
@@ -834,7 +840,7 @@ class TemperatureGraph {
             x: 20,
             y: this.padding.top + graphHeight / 2,
             'text-anchor': 'middle',
-            fill: '#fff',
+            fill: this.getThemeColor('--text-primary'),
             'font-size': '14',
             'font-weight': 'bold',
             transform: `rotate(-90, 20, ${this.padding.top + graphHeight / 2})`
@@ -946,7 +952,7 @@ class TemperatureGraph {
                 x: x,
                 y: y - 20,
                 'text-anchor': 'middle',
-                fill: '#fff',
+                fill: this.getThemeColor('--text-primary'),
                 'font-size': '11',
                 'font-weight': 'bold',
                 'pointer-events': 'none',

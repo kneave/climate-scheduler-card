@@ -85,6 +85,15 @@ class ClimateSchedulerPanel extends HTMLElement {
 
     set hass(value) {
         this._hass = value;
+        
+        // Apply theme based on Home Assistant theme mode
+        if (value && value.themes) {
+            const isDark = value.themes.darkMode;
+            const theme = isDark ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', theme);
+            this.setAttribute('data-theme', theme);
+        }
+        
         // Pass hass object to app if it's already initialized
         if (window.updateHassConnection && value) {
             window.updateHassConnection(value);
