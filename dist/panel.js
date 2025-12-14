@@ -20,7 +20,16 @@ let scriptsLoaded = false;
 const getVersion = () => {
     const scriptUrl = import.meta.url;
     const version = new URL(scriptUrl).searchParams.get('v');
-    return version
+    if (!version) return null;
+    
+    // For comma-separated format "tag,timestamp", use timestamp for cache busting
+    const parts = version.split(',');
+    if (parts.length >= 2) {
+        // Has timestamp - use it for cache busting (changes every deployment)
+        return parts[1];
+    }
+    // No comma means HACS version or old format - use as-is
+    return version;
 }
 
 // Load dependencies in order
@@ -79,6 +88,64 @@ class ClimateSchedulerPanel extends HTMLElement {
 
             // Small delay to ensure DOM is fully rendered
             await new Promise(resolve => setTimeout(resolve, 100));
+
+            // Update version info in footer
+            const versionElement = this.querySelector('#version-info');
+            if (versionElement) {
+                try {
+                    const scriptUrl = import.meta.url;
+                    const hacstag = new URL(scriptUrl).searchParams.get('hacstag');
+                    const versionParam = new URL(scriptUrl).searchParams.get('v');
+                    
+                    let cardVersion = '';
+                    
+                    if (hacstag) {
+                        // Installed via HACS - use hacstag (remove leading 'v' if present)
+                        const tag = hacstag.replace(/^v/, '');
+                        cardVersion = `v${tag}`;
+                    } else if (versionParam) {
+                        // Has version parameter - check if it's dev (has timestamp) or released (tag only)
+                        const parts = versionParam.split(',');
+                        const tag = (parts[0] || 'unknown').replace(/^v/, '');
+                        if (parts.length >= 2) {
+                            // Has timestamp - it's a dev build
+                            cardVersion = `v${tag} (dev)`;
+                        } else {
+                            // Tag only - it's a release build
+                            cardVersion = `v${tag}`;
+                        }
+                    } else {
+                        // Try to load .version file to determine if it's dev or manual
+                        try {
+                            const basePath = '/local/community/climate-scheduler-card';
+                            const response = await fetch(`${basePath}/.version`);
+                            if (response.ok) {
+                                const versionContent = await response.text();
+                                const parts = versionContent.trim().split(',');
+                                const tag = (parts[0] || 'unknown').replace(/^v/, '');
+                                if (parts.length >= 2) {
+                                    // Has timestamp - dev build
+                                    cardVersion = `v${tag} (dev)`;
+                                } else {
+                                    // Tag only - release build
+                                    cardVersion = `v${tag}`;
+                                }
+                            } else {
+                                // No .version file - manual installation
+                                cardVersion = '(manual)';
+                            }
+                        } catch (e) {
+                            // Couldn't load .version - manual installation
+                            cardVersion = '(manual)';
+                        }
+                    }
+                    
+                    versionElement.textContent = `Climate Scheduler Card ${cardVersion}`;
+                } catch (e) {
+                    console.warn('Failed to determine version:', e);
+                    versionElement.textContent = 'Climate Scheduler Card';
+                }
+            }
 
             // Initialize the app when panel is loaded and scripts are ready
             if (window.initClimateSchedulerApp) {

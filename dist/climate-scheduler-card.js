@@ -84,7 +84,10 @@ class ClimateSchedulerCard extends HTMLElement {
         try {
           const response = await fetch(`${basePath}/.version`);
           if (response.ok) {
-            version = await response.text();
+            const versionText = await response.text();
+            // .version file format: "tag,timestamp"
+            const parts = versionText.trim().split(',');
+            version = parts[0]; // Use the tag part
           }
         } catch (e) {
           console.warn('Failed to load .version file:', e);

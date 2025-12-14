@@ -61,11 +61,24 @@ if (Test-Path $TARGET) {
 # Deploy new version
 Write-Host "Deploying new version..." -ForegroundColor Cyan
 
-# Create .version file with Unix timestamp
+# Get git tag and create .version file
+try {
+    $gitTag = git describe --tags --abbrev=0 2>$null
+    if (-not $gitTag) {
+        $gitTag = "dev"
+    }
+} catch {
+    $gitTag = "dev"
+}
+
 $unixTimestamp = [int][double]::Parse((Get-Date -UFormat %s))
 $versionFilePath = Join-Path $SOURCE ".version"
-Set-Content -Path $versionFilePath -Value $unixTimestamp -NoNewline
-Write-Host "Created .version file with timestamp: $unixTimestamp" -ForegroundColor Green
+
+# Write tag,timestamp (comma-separated)
+$versionContent = "$gitTag,$unixTimestamp"
+Set-Content -Path $versionFilePath -Value $versionContent -NoNewline
+
+Write-Host "Created .version file with tag: $gitTag and timestamp: $unixTimestamp" -ForegroundColor Green
 
 # Create target directory
 New-Item -ItemType Directory -Force -Path $TARGET | Out-Null
