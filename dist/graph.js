@@ -997,7 +997,7 @@ class TemperatureGraph {
                 'pointer-events': 'none',
                 'data-node-index': index
             });
-            text.textContent = `${node.temp}°C`;
+            text.textContent = `${node.temp}${this.temperatureUnit}`;
             text.classList.add('node-label');
             
             // Hide label if this node is being dragged
