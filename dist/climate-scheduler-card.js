@@ -76,9 +76,12 @@ class ClimateSchedulerCard extends HTMLElement {
     // Load panel module from local community path
     try {
       const basePath = '/local/community/climate-scheduler-card';
+      const scriptUrl = import.meta.url;
+      const version = new URL(scriptUrl).searchParams.get('hacstag');
+
       
       if (!customElements.get('climate-scheduler-panel')) {
-        await import(`${basePath}/panel.js`);
+        await import(`${basePath}/panel.js?v=${version}`);
       }
     } catch (e) {
       this._container.innerHTML = `

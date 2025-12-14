@@ -17,6 +17,12 @@ const loadScript = (src) => {
 // Track if scripts are loaded
 let scriptsLoaded = false;
 
+const getVersion = () => {
+    const scriptUrl = import.meta.url;
+    const version = new URL(scriptUrl).searchParams.get('v');
+    return version
+}
+
 // Load dependencies in order
 const loadScripts = () => {
     if (scriptsLoaded) return Promise.resolve();
@@ -25,14 +31,15 @@ const loadScripts = () => {
     const protocol = window.location.protocol;
     const host = window.location.host;
     const basePath = `${protocol}//${host}/local/community/climate-scheduler-card`;
+    const version = getVersion();
     
     console.log('Loading Climate Scheduler scripts from:', basePath);
     
     return Promise.all([
-        loadScript(`${basePath}/graph.js`),
-        loadScript(`${basePath}/ha-api.js`)
+        loadScript(`${basePath}/graph.js?v=${version}`),
+        loadScript(`${basePath}/ha-api.js?v=${version}`)
     ]).then(() => {
-        return loadScript(`${basePath}/app.js`);
+        return loadScript(`${basePath}/app.js?v=${version}`);
     }).then(() => {
         scriptsLoaded = true;
         console.log('Climate Scheduler scripts loaded successfully');
@@ -114,9 +121,10 @@ class ClimateSchedulerPanel extends HTMLElement {
             // Load CSS into light DOM using absolute URL
             const protocol = window.location.protocol;
             const host = window.location.host;
+            const version = getVersion();
             const styleLink = document.createElement('link');
             styleLink.rel = 'stylesheet';
-            styleLink.href = `${protocol}//${host}/local/community/climate-scheduler-card/styles.css`;
+            styleLink.href = `${protocol}//${host}/local/community/climate-scheduler-card/styles.css?v=${version}`;
             this.appendChild(styleLink);
 
             // Create container div for content
