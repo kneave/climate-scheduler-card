@@ -677,7 +677,7 @@ function createGroupMembersTable(entityIds) {
     // Create header
     const header = document.createElement('div');
     header.className = 'group-members-header';
-    header.innerHTML = '<span>Name</span><span>Current</span><span>Target</span><span>Scheduled</span><span style="text-align: center;">Remove</span>';
+    header.innerHTML = '<span>Name</span><span>Current</span><span>Target</span><span>Scheduled</span><span style="text-align: center;">Actions</span>';
     table.appendChild(header);
     
     // Get current time for scheduled temp calculation
@@ -715,9 +715,25 @@ function createGroupMembersTable(entityIds) {
             scheduledCell.textContent = '--';
         }
         
-        // Add remove button cell
-        const removeCell = document.createElement('span');
-        removeCell.style.textAlign = 'center';
+        // Add action buttons cell
+        const actionCell = document.createElement('span');
+        actionCell.style.textAlign = 'center';
+        actionCell.style.display = 'flex';
+        actionCell.style.gap = '4px';
+        actionCell.style.justifyContent = 'center';
+        
+        const moveBtn = document.createElement('button');
+        moveBtn.className = 'btn-icon-small move-entity-btn';
+        moveBtn.innerHTML = 'M';
+        moveBtn.title = 'Move to another group';
+        moveBtn.onclick = (e) => {
+            e.stopPropagation();
+            const groupName = currentGroup;
+            if (groupName) {
+                showMoveToGroupModal(groupName, entityId);
+            }
+        };
+        
         const removeBtn = document.createElement('button');
         removeBtn.className = 'btn-icon-small remove-entity-btn';
         removeBtn.innerHTML = '✕';
@@ -730,13 +746,15 @@ function createGroupMembersTable(entityIds) {
                 removeEntityFromGroup(groupName, entityId);
             }
         };
-        removeCell.appendChild(removeBtn);
+        
+        actionCell.appendChild(moveBtn);
+        actionCell.appendChild(removeBtn);
         
         row.appendChild(nameCell);
         row.appendChild(currentCell);
         row.appendChild(targetCell);
         row.appendChild(scheduledCell);
-        row.appendChild(removeCell);
+        row.appendChild(actionCell);
         table.appendChild(row);
     });
     
@@ -845,6 +863,38 @@ async function removeEntityFromGroup(groupName, entityId) {
         console.error('Failed to remove entity from group:', error);
         showToast('Failed to remove entity from group: ' + error.message, 'error');
     }
+}
+
+// Show move to group modal
+function showMoveToGroupModal(currentGroupName, entityId) {
+    const modal = getDocumentRoot().querySelector('#add-to-group-modal');
+    const select = getDocumentRoot().querySelector('#add-to-group-select');
+    const newGroupInput = getDocumentRoot().querySelector('#new-group-name-inline');
+    
+    if (!modal || !select) return;
+    
+    // Store entity ID and current group on modal
+    modal.dataset.entityId = entityId;
+    modal.dataset.currentGroup = currentGroupName;
+    modal.dataset.isMove = 'true';
+    
+    // Populate group select (excluding current group)
+    select.innerHTML = '<option value="">Select a group...</option>';
+    Object.keys(allGroups).forEach(groupName => {
+        if (groupName !== currentGroupName) {
+            const option = document.createElement('option');
+            option.value = groupName;
+            option.textContent = groupName;
+            select.appendChild(option);
+        }
+    });
+    
+    // Clear new group input
+    if (newGroupInput) {
+        newGroupInput.value = '';
+    }
+    
+    modal.style.display = 'flex';
 }
 
 // Show add to group modal
@@ -3197,7 +3247,11 @@ function setupEventListeners() {
     if (addToGroupCancel) {
         addToGroupCancel.addEventListener('click', () => {
             const modal = getDocumentRoot().querySelector('#add-to-group-modal');
-            if (modal) modal.style.display = 'none';
+            if (modal) {
+                modal.style.display = 'none';
+                delete modal.dataset.currentGroup;
+                delete modal.dataset.isMove;
+            }
         });
     }
     
@@ -3207,6 +3261,8 @@ function setupEventListeners() {
         addToGroupConfirm.addEventListener('click', async () => {
             const modal = getDocumentRoot().querySelector('#add-to-group-modal');
             const entityId = modal ? modal.dataset.entityId : null;
+            const currentGroupName = modal ? modal.dataset.currentGroup : null;
+            const isMove = modal ? modal.dataset.isMove === 'true' : false;
             const selectElement = getDocumentRoot().querySelector('#add-to-group-select');
             const newGroupInput = getDocumentRoot().querySelector('#new-group-name-inline');
             
@@ -3237,16 +3293,33 @@ function setupEventListeners() {
             }
             
             try {
+                // If moving, remove from current group first
+                if (isMove && currentGroupName) {
+                    await haAPI.removeFromGroup(currentGroupName, entityId);
+                }
+                
+                // Add to new group
                 await haAPI.addToGroup(groupName, entityId);
                 
-                // Close modal
-                if (modal) modal.style.display = 'none';
+                // Close modal and clear move state
+                if (modal) {
+                    modal.style.display = 'none';
+                    delete modal.dataset.currentGroup;
+                    delete modal.dataset.isMove;
+                }
                 
                 // Reload groups
                 await loadGroups();
                 
                 // Reload entity list (entity should disappear from active/disabled)
                 await renderEntityList();
+                
+                // Show appropriate message
+                if (isMove && currentGroupName) {
+                    showToast(`Moved entity from ${currentGroupName} to ${groupName}`, 'success');
+                } else {
+                    showToast(`Added entity to ${groupName}`, 'success');
+                }
             } catch (error) {
                 console.error('Failed to add entity to group:', error);
                 alert('Failed to add entity to group');
