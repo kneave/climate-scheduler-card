@@ -705,6 +705,7 @@ async function setupProfileHandlers(container, groupData) {
                 await haAPI.createProfile(targetId, profileName.trim(), isGroup);
                 showToast(`Created profile: ${profileName}`, 'success');
                 await loadProfiles(container, targetId, isGroup);
+                updateGraphProfileDropdown();
             } catch (error) {
                 console.error('Failed to create profile:', error);
                 showToast('Failed to create profile: ' + error.message, 'error');
@@ -727,6 +728,7 @@ async function setupProfileHandlers(container, groupData) {
                 await haAPI.renameProfile(targetId, currentProfile, newName.trim(), isGroup);
                 showToast(`Renamed profile to: ${newName}`, 'success');
                 await loadProfiles(container, targetId, isGroup);
+                updateGraphProfileDropdown();
             } catch (error) {
                 console.error('Failed to rename profile:', error);
                 showToast('Failed to rename profile: ' + error.message, 'error');
@@ -748,6 +750,7 @@ async function setupProfileHandlers(container, groupData) {
                 await haAPI.deleteProfile(targetId, currentProfile, isGroup);
                 showToast(`Deleted profile: ${currentProfile}`, 'success');
                 await loadProfiles(container, targetId, isGroup);
+                updateGraphProfileDropdown();
             } catch (error) {
                 console.error('Failed to delete profile:', error);
                 showToast('Failed to delete profile: ' + error.message, 'error');
@@ -1342,9 +1345,22 @@ function createScheduleEditor() {
     editor.className = 'schedule-editor-inline';
     editor.innerHTML = `
         <div class="editor-header-inline">
-            <div class="day-period-selector" id="day-period-selector" style="display: none;">
-                <div class="day-period-buttons" id="day-period-buttons">
-                    <!-- Buttons will be populated based on schedule mode -->
+            <div class="graph-top-controls">
+                <div class="day-period-selector" id="day-period-selector" style="display: none;">
+                    <div class="day-period-buttons" id="day-period-buttons">
+                        <!-- Buttons will be populated based on schedule mode -->
+                    </div>
+                </div>
+                <div class="graph-quick-actions">
+                    <button id="graph-copy-btn" class="btn-quick-action" title="Copy schedule">Copy</button>
+                    <button id="graph-paste-btn" class="btn-quick-action" title="Paste schedule" disabled>Paste</button>
+                    <button id="graph-undo-btn" class="btn-quick-action" title="Undo last change">Undo</button>
+                </div>
+                <div class="graph-profile-selector" id="graph-profile-selector">
+                    <label>Profile:</label>
+                    <select id="graph-profile-dropdown" class="graph-profile-dropdown">
+                        <option value="Default">Default</option>
+                    </select>
                 </div>
             </div>
         </div>
@@ -2088,6 +2104,26 @@ function attachEditorEventListeners(editorElement) {
             await switchDay(btn.dataset.day);
         });
     });
+    
+    // Graph quick action buttons
+    const graphCopyBtn = editorElement.querySelector('#graph-copy-btn');
+    if (graphCopyBtn) {
+        graphCopyBtn.onclick = () => {
+            copySchedule();
+        };
+    }
+    
+    const graphPasteBtn = editorElement.querySelector('#graph-paste-btn');
+    if (graphPasteBtn) {
+        graphPasteBtn.onclick = () => {
+            pasteSchedule();
+        };
+    }
+    
+    const graphUndoBtn = editorElement.querySelector('#graph-undo-btn');
+    if (graphUndoBtn && graph) {
+        graph.setUndoButton(graphUndoBtn);
+    }
 }
 
 // Clipboard for schedule copy/paste
@@ -2098,6 +2134,10 @@ function updatePasteButtonState() {
     const pasteBtn = getDocumentRoot().querySelector('#paste-schedule-btn');
     if (pasteBtn) {
         pasteBtn.disabled = !scheduleClipboard || scheduleClipboard.length === 0;
+    }
+    const graphPasteBtn = getDocumentRoot().querySelector('#graph-paste-btn');
+    if (graphPasteBtn) {
+        graphPasteBtn.disabled = !scheduleClipboard || scheduleClipboard.length === 0;
     }
 }
 
@@ -2363,6 +2403,9 @@ function updateGraphDaySelector() {
     
     if (!dayPeriodSelector || !dayPeriodButtons) return;
     
+    // Update profile dropdown
+    updateGraphProfileDropdown();
+    
     // Hide selector if in all_days mode
     if (currentScheduleMode === 'all_days') {
         dayPeriodSelector.style.display = 'none';
@@ -2420,6 +2463,66 @@ function updateGraphDaySelector() {
             dayPeriodButtons.appendChild(btn);
         });
     }
+}
+
+// Update the profile dropdown above the graph
+function updateGraphProfileDropdown() {
+    const graphProfileDropdown = getDocumentRoot().querySelector('#graph-profile-dropdown');
+    if (!graphProfileDropdown) return;
+    
+    // Get current active profile
+    const activeProfile = currentEntityId 
+        ? (allEntities[currentEntityId]?.active_profile || 'Default')
+        : (currentGroup && allGroups[currentGroup]?.active_profile) || 'Default';
+    
+    // Get all profiles
+    const profiles = currentEntityId
+        ? (allEntities[currentEntityId]?.profiles ? Object.keys(allEntities[currentEntityId].profiles) : ['Default'])
+        : (currentGroup && allGroups[currentGroup]?.profiles ? Object.keys(allGroups[currentGroup].profiles) : ['Default']);
+    
+    // Update dropdown options
+    graphProfileDropdown.innerHTML = '';
+    profiles.forEach(profileName => {
+        const option = document.createElement('option');
+        option.value = profileName;
+        option.textContent = profileName;
+        if (profileName === activeProfile) {
+            option.selected = true;
+        }
+        graphProfileDropdown.appendChild(option);
+    });
+    
+    // Remove existing event listener by cloning
+    const newDropdown = graphProfileDropdown.cloneNode(true);
+    graphProfileDropdown.parentNode.replaceChild(newDropdown, graphProfileDropdown);
+    
+    // Add event listener for profile change
+    newDropdown.addEventListener('change', async (e) => {
+        const newProfile = e.target.value;
+        try {
+            if (currentGroup) {
+                await haAPI.setActiveProfile(currentGroup, newProfile, true);
+                // Reload group data from server
+                allGroups = await haAPI.getGroups();
+                if (allGroups.groups) allGroups = allGroups.groups;
+                await editGroupSchedule(currentGroup);
+            } else if (currentEntityId) {
+                await haAPI.setActiveProfile(currentEntityId, newProfile, false);
+                // Reload entity data
+                allEntities = await haAPI.getEntities();
+                await loadEntitySchedule(currentEntityId);
+            }
+            
+            // Update both dropdowns
+            await loadProfiles();
+            updateGraphProfileDropdown();
+            
+            showToast(`Switched to profile: ${newProfile}`, 'success');
+        } catch (error) {
+            console.error('Failed to switch profile:', error);
+            showToast('Failed to switch profile', 'error');
+        }
+    });
 }
 
 // Update graph title to show which day is being edited

@@ -1882,9 +1882,101 @@ footer {
     opacity: 0.4;
     cursor: not-allowed;
 }
+
+/* Graph Top Controls */
+.graph-top-controls {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+
+.day-period-selector {
+    flex: 1;
+    padding: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.graph-quick-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin: 0 auto;
+}
+
+.btn-quick-action {
+    padding: 6px 14px;
+    background: var(--surface-light);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 500;
+}
+
+.btn-quick-action:hover:not(:disabled) {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
+.btn-quick-action:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.graph-profile-selector {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-left: auto;
+}
+
+.graph-profile-selector label {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
+.graph-profile-dropdown {
+    padding: 6px 12px;
+    background: var(--surface-light);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    outline: none;
+    transition: all 0.2s;
+    min-width: 120px;
+}
+
+.graph-profile-dropdown:hover {
+    border-color: var(--primary-color);
+}
+
+.graph-profile-dropdown:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(3, 169, 244, 0.2);
+}
+
 /* Day/Period Selector above graph */
 .day-period-selector {
-    margin-bottom: 16px;
+    flex: 1;
     padding: 12px;
     background: var(--surface);
     border: 1px solid var(--border);
