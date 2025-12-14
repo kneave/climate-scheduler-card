@@ -61,6 +61,12 @@ if (Test-Path $TARGET) {
 # Deploy new version
 Write-Host "Deploying new version..." -ForegroundColor Cyan
 
+# Create .version file with Unix timestamp
+$unixTimestamp = [int][double]::Parse((Get-Date -UFormat %s))
+$versionFilePath = Join-Path $SOURCE ".version"
+Set-Content -Path $versionFilePath -Value $unixTimestamp -NoNewline
+Write-Host "Created .version file with timestamp: $unixTimestamp" -ForegroundColor Green
+
 # Create target directory
 New-Item -ItemType Directory -Force -Path $TARGET | Out-Null
 
