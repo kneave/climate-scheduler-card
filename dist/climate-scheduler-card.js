@@ -76,9 +76,24 @@ class ClimateSchedulerCard extends HTMLElement {
     // Load panel module from local community path
     try {
       const basePath = '/local/community/climate-scheduler-card';
+      const scriptUrl = import.meta.url;
+      let version = new URL(scriptUrl).searchParams.get('hacstag');
+      
+      // If no hacstag, load version from .version file
+      if (!version) {
+        try {
+          const response = await fetch(`${basePath}/.version`);
+          if (response.ok) {
+            version = await response.text();
+          }
+        } catch (e) {
+          console.warn('Failed to load .version file:', e);
+        }
+      }
+
       
       if (!customElements.get('climate-scheduler-panel')) {
-        await import(`${basePath}/panel.js`);
+        await import(`${basePath}/panel.js?v=${version}`);
       }
     } catch (e) {
       this._container.innerHTML = `

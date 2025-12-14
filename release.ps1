@@ -379,7 +379,17 @@ if ($Version -ne $currentVersion) {
     Write-Host "`nVersion unchanged: $Version" -ForegroundColor Yellow
 }
 
-# Commit manifest and changelog changes
+# Create .version file with version tag
+Write-Host "`n$(if ($DryRun) { '[DRY RUN] Would create' } else { 'Creating' }) .version file..." -ForegroundColor Yellow
+if (-not $DryRun) {
+    $versionFilePath = "dist\.version"
+    Set-Content -Path $versionFilePath -Value $Version -NoNewline
+    Write-Host "Created dist/.version with version: $Version" -ForegroundColor Green
+} else {
+    Write-Host "Would create dist/.version with version: $Version" -ForegroundColor Cyan
+}
+
+# Commit manifest, changelog, and .version changes
 $filesToCommit = @()
 if ($Version -ne $currentVersion) {
     $filesToCommit += "manifest.json"
@@ -388,6 +398,12 @@ if (Test-Path "CHANGELOG.md") {
     $status = git status --porcelain CHANGELOG.md
     if ($status) {
         $filesToCommit += "CHANGELOG.md"
+    }
+}
+if (Test-Path "dist\.version") {
+    $status = git status --porcelain "dist\.version"
+    if ($status) {
+        $filesToCommit += "dist\.version"
     }
 }
 
