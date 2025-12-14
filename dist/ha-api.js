@@ -484,6 +484,53 @@ class HomeAssistantAPI {
         }
     }
     
+    // Profile management methods
+    async createProfile(targetId, profileName, isGroup = false) {
+        return await this.callService('climate_scheduler', 'create_profile', {
+            target_id: targetId,
+            profile_name: profileName,
+            is_group: isGroup
+        });
+    }
+    
+    async deleteProfile(targetId, profileName, isGroup = false) {
+        return await this.callService('climate_scheduler', 'delete_profile', {
+            target_id: targetId,
+            profile_name: profileName,
+            is_group: isGroup
+        });
+    }
+    
+    async renameProfile(targetId, oldName, newName, isGroup = false) {
+        return await this.callService('climate_scheduler', 'rename_profile', {
+            target_id: targetId,
+            old_name: oldName,
+            new_name: newName,
+            is_group: isGroup
+        });
+    }
+    
+    async setActiveProfile(targetId, profileName, isGroup = false) {
+        return await this.callService('climate_scheduler', 'set_active_profile', {
+            target_id: targetId,
+            profile_name: profileName,
+            is_group: isGroup
+        });
+    }
+    
+    async getProfiles(targetId, isGroup = false) {
+        try {
+            const result = await this.callService('climate_scheduler', 'get_profiles', {
+                target_id: targetId,
+                is_group: isGroup
+            }, true);
+            return result;
+        } catch (error) {
+            console.error('Failed to get profiles:', error);
+            return { profiles: {}, active_profile: null };
+        }
+    }
+    
     onStateUpdate(callback) {
         this.stateUpdateCallbacks.push(callback);
     }

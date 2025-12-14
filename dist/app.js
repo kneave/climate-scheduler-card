@@ -555,6 +555,21 @@ function createSettingsPanel(groupData, editor) {
         </div>
     `;
     
+    // Add profile selector
+    const profileSelectorHTML = `
+        <div class="profile-selector">
+            <h3>Schedule Profile</h3>
+            <div class="profile-controls">
+                <select id="profile-dropdown" class="profile-dropdown">
+                    <option value="Default">Default</option>
+                </select>
+                <button id="new-profile-btn" class="btn-profile" title="Create new profile">＋</button>
+                <button id="rename-profile-btn" class="btn-profile" title="Rename profile">✎</button>
+                <button id="delete-profile-btn" class="btn-profile" title="Delete profile">✕</button>
+            </div>
+        </div>
+    `;
+    
     // Add schedule mode selector
     const modeSelectorHTML = `
         <div class="schedule-mode-selector">
@@ -593,7 +608,7 @@ function createSettingsPanel(groupData, editor) {
         </div>
     `;
     
-    settingsPanel.innerHTML = controlsHTML + modeSelectorHTML;
+    settingsPanel.innerHTML = controlsHTML + profileSelectorHTML + modeSelectorHTML;
     
     // Toggle functionality
     toggleHeader.onclick = () => {
@@ -632,9 +647,153 @@ function createSettingsPanel(groupData, editor) {
                 };
             }
         }
+        
+        // Add profile management handlers
+        setupProfileHandlers(container, groupData);
     }, 0);
     
     return container;
+}
+
+// Setup profile management event handlers
+async function setupProfileHandlers(container, groupData) {
+    const isGroup = !!groupData;
+    const targetId = isGroup ? currentGroup : currentEntityId;
+    
+    console.log('setupProfileHandlers - isGroup:', isGroup, 'targetId:', targetId, 'groupData:', groupData);
+    
+    if (!targetId) {
+        console.warn('setupProfileHandlers - no targetId, aborting');
+        return;
+    }
+    
+    // Load and populate profiles
+    await loadProfiles(container, targetId, isGroup);
+    
+    // Profile dropdown change handler
+    const profileDropdown = container.querySelector('#profile-dropdown');
+    if (profileDropdown) {
+        profileDropdown.onchange = async () => {
+            const selectedProfile = profileDropdown.value;
+            try {
+                await haAPI.setActiveProfile(targetId, selectedProfile, isGroup);
+                showToast(`Switched to profile: ${selectedProfile}`, 'success');
+                // Reload the editor with the new profile
+                if (isGroup) {
+                    // Reload group data from server before editing
+                    const groupsResult = await haAPI.getGroups();
+                    allGroups = groupsResult.groups || {};
+                    await editGroupSchedule(targetId);
+                } else {
+                    await selectEntity(targetId);
+                }
+            } catch (error) {
+                console.error('Failed to switch profile:', error);
+                showToast('Failed to switch profile: ' + error.message, 'error');
+            }
+        };
+    }
+    
+    // New profile button
+    const newProfileBtn = container.querySelector('#new-profile-btn');
+    if (newProfileBtn) {
+        newProfileBtn.onclick = async () => {
+            const profileName = prompt('Enter name for new profile:');
+            if (!profileName || profileName.trim() === '') return;
+            
+            try {
+                await haAPI.createProfile(targetId, profileName.trim(), isGroup);
+                showToast(`Created profile: ${profileName}`, 'success');
+                await loadProfiles(container, targetId, isGroup);
+            } catch (error) {
+                console.error('Failed to create profile:', error);
+                showToast('Failed to create profile: ' + error.message, 'error');
+            }
+        };
+    }
+    
+    // Rename profile button
+    const renameProfileBtn = container.querySelector('#rename-profile-btn');
+    if (renameProfileBtn) {
+        renameProfileBtn.onclick = async () => {
+            const dropdown = container.querySelector('#profile-dropdown');
+            const currentProfile = dropdown?.value;
+            if (!currentProfile) return;
+            
+            const newName = prompt(`Rename profile "${currentProfile}" to:`, currentProfile);
+            if (!newName || newName.trim() === '' || newName === currentProfile) return;
+            
+            try {
+                await haAPI.renameProfile(targetId, currentProfile, newName.trim(), isGroup);
+                showToast(`Renamed profile to: ${newName}`, 'success');
+                await loadProfiles(container, targetId, isGroup);
+            } catch (error) {
+                console.error('Failed to rename profile:', error);
+                showToast('Failed to rename profile: ' + error.message, 'error');
+            }
+        };
+    }
+    
+    // Delete profile button
+    const deleteProfileBtn = container.querySelector('#delete-profile-btn');
+    if (deleteProfileBtn) {
+        deleteProfileBtn.onclick = async () => {
+            const dropdown = container.querySelector('#profile-dropdown');
+            const currentProfile = dropdown?.value;
+            if (!currentProfile) return;
+            
+            if (!confirm(`Delete profile "${currentProfile}"?`)) return;
+            
+            try {
+                await haAPI.deleteProfile(targetId, currentProfile, isGroup);
+                showToast(`Deleted profile: ${currentProfile}`, 'success');
+                await loadProfiles(container, targetId, isGroup);
+            } catch (error) {
+                console.error('Failed to delete profile:', error);
+                showToast('Failed to delete profile: ' + error.message, 'error');
+            }
+        };
+    }
+}
+
+// Load and populate profiles dropdown
+async function loadProfiles(container, targetId, isGroup) {
+    console.log('loadProfiles - targetId:', targetId, 'isGroup:', isGroup);
+    try {
+        const result = await haAPI.getProfiles(targetId, isGroup);
+        console.log('loadProfiles - result:', result);
+        const profiles = result.profiles || {};
+        const activeProfile = result.active_profile || 'Default';
+        
+        const dropdown = container.querySelector('#profile-dropdown');
+        if (!dropdown) {
+            console.warn('loadProfiles - dropdown not found');
+            return;
+        }
+        
+        // Clear and repopulate dropdown
+        dropdown.innerHTML = '';
+        Object.keys(profiles).forEach(profileName => {
+            const option = document.createElement('option');
+            option.value = profileName;
+            option.textContent = profileName;
+            if (profileName === activeProfile) {
+                option.selected = true;
+            }
+            dropdown.appendChild(option);
+        });
+        
+        // Update button states
+        const renameBtn = container.querySelector('#rename-profile-btn');
+        const deleteBtn = container.querySelector('#delete-profile-btn');
+        const profileCount = Object.keys(profiles).length;
+        
+        if (renameBtn) renameBtn.disabled = profileCount === 0;
+        if (deleteBtn) deleteBtn.disabled = profileCount <= 1;
+        
+    } catch (error) {
+        console.error('Failed to load profiles:', error);
+    }
 }
 
 // Create group members table element
