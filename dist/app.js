@@ -1342,6 +1342,11 @@ function createScheduleEditor() {
     editor.className = 'schedule-editor-inline';
     editor.innerHTML = `
         <div class="editor-header-inline">
+            <div class="day-period-selector" id="day-period-selector" style="display: none;">
+                <div class="day-period-buttons" id="day-period-buttons">
+                    <!-- Buttons will be populated based on schedule mode -->
+                </div>
+            </div>
         </div>
 
         <div class="entity-status">
@@ -2344,8 +2349,77 @@ function updateScheduleModeUI() {
         });
     }
     
+    // Update day/period selector above graph
+    updateGraphDaySelector();
+    
     // Update graph title to show current day
     updateGraphTitle();
+}
+
+// Update the day/period selector above the graph
+function updateGraphDaySelector() {
+    const dayPeriodSelector = getDocumentRoot().querySelector('#day-period-selector');
+    const dayPeriodButtons = getDocumentRoot().querySelector('#day-period-buttons');
+    
+    if (!dayPeriodSelector || !dayPeriodButtons) return;
+    
+    // Hide selector if in all_days mode
+    if (currentScheduleMode === 'all_days') {
+        dayPeriodSelector.style.display = 'none';
+        return;
+    }
+    
+    // Show selector
+    dayPeriodSelector.style.display = 'block';
+    
+    // Clear existing buttons
+    dayPeriodButtons.innerHTML = '';
+    
+    // Create buttons based on mode
+    if (currentScheduleMode === 'individual') {
+        const days = [
+            { value: 'mon', label: 'Mon' },
+            { value: 'tue', label: 'Tue' },
+            { value: 'wed', label: 'Wed' },
+            { value: 'thu', label: 'Thu' },
+            { value: 'fri', label: 'Fri' },
+            { value: 'sat', label: 'Sat' },
+            { value: 'sun', label: 'Sun' }
+        ];
+        
+        days.forEach(day => {
+            const btn = document.createElement('button');
+            btn.className = 'day-period-btn';
+            btn.textContent = day.label;
+            btn.dataset.day = day.value;
+            if (currentDay === day.value) {
+                btn.classList.add('active');
+            }
+            btn.addEventListener('click', async () => {
+                await switchDay(day.value);
+            });
+            dayPeriodButtons.appendChild(btn);
+        });
+    } else if (currentScheduleMode === '5/2') {
+        const periods = [
+            { value: 'weekday', label: 'Weekday' },
+            { value: 'weekend', label: 'Weekend' }
+        ];
+        
+        periods.forEach(period => {
+            const btn = document.createElement('button');
+            btn.className = 'day-period-btn';
+            btn.textContent = period.label;
+            btn.dataset.day = period.value;
+            if (currentDay === period.value) {
+                btn.classList.add('active');
+            }
+            btn.addEventListener('click', async () => {
+                await switchDay(period.value);
+            });
+            dayPeriodButtons.appendChild(btn);
+        });
+    }
 }
 
 // Update graph title to show which day is being edited

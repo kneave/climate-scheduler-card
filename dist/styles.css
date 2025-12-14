@@ -1882,3 +1882,42 @@ footer {
     opacity: 0.4;
     cursor: not-allowed;
 }
+/* Day/Period Selector above graph */
+.day-period-selector {
+    margin-bottom: 16px;
+    padding: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.day-period-buttons {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.day-period-btn {
+    padding: 8px 16px;
+    background: var(--surface-light);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-width: 60px;
+}
+
+.day-period-btn:hover {
+    background: var(--surface-hover);
+    border-color: var(--primary-color);
+}
+
+.day-period-btn.active {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+    font-weight: 500;
+}
