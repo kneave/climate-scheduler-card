@@ -4208,6 +4208,13 @@ async function loadSettings() {
                 tooltipSelect.value = tooltipMode;
             }
         }
+        // Load derivative sensor setting
+        if (settings && typeof settings.create_derivative_sensors !== 'undefined') {
+            const checkbox = getDocumentRoot().querySelector('#create-derivative-sensors');
+            if (checkbox) {
+                checkbox.checked = settings.create_derivative_sensors;
+            }
+        }
         // Load min/max temps if present (convert if unit changed)
         if (settings && typeof settings.min_temp !== 'undefined') {
             let minTemp = parseFloat(settings.min_temp);
@@ -4274,6 +4281,11 @@ async function saveSettings() {
         const maxInput = getDocumentRoot().querySelector('#max-temp');
         if (minInput && minInput.value !== '') settings.min_temp = parseFloat(minInput.value);
         if (maxInput && maxInput.value !== '') settings.max_temp = parseFloat(maxInput.value);
+        // Read derivative sensor checkbox
+        const derivativeCheckbox = getDocumentRoot().querySelector('#create-derivative-sensors');
+        if (derivativeCheckbox) {
+            settings.create_derivative_sensors = derivativeCheckbox.checked;
+        }
         await haAPI.saveSettings(settings);
         // Update runtime globals and graphs
         if (typeof settings.min_temp !== 'undefined') {
@@ -4484,6 +4496,72 @@ async function setupSettingsPanel() {
         });
     }
     
+    // Derivative sensor checkbox - auto-save on change
+    const derivativeCheckbox = getDocumentRoot().querySelector('#create-derivative-sensors');
+    if (derivativeCheckbox) {
+        derivativeCheckbox.addEventListener('change', async () => {
+            await saveSettings();
+        });
+    }
+    
+    // Cleanup derivative sensors button
+    const cleanupBtn = getDocumentRoot().querySelector('#cleanup-derivative-sensors-btn');
+    if (cleanupBtn) {
+        cleanupBtn.addEventListener('click', async () => {
+            try {
+                // First check if auto-creation is disabled
+                const settings = await haAPI.getSettings();
+                const autoCreationEnabled = settings?.create_derivative_sensors !== false;
+                
+                let confirmDeleteAll = false;
+                if (!autoCreationEnabled) {
+                    // Ask for confirmation to delete all
+                    const confirmed = confirm(
+                        'Auto-creation of derivative sensors is disabled.\\n\\n' +
+                        'This will DELETE ALL climate_scheduler derivative sensors.\\n\\n' +
+                        'Are you sure you want to continue?'
+                    );
+                    if (!confirmed) return;
+                    confirmDeleteAll = true;
+                } else {
+                    // Just cleanup orphaned sensors
+                    const confirmed = confirm(
+                        'This will remove derivative sensors for thermostats that no longer exist.\\n\\n' +
+                        'Continue?'
+                    );
+                    if (!confirmed) return;
+                }
+                
+                cleanupBtn.textContent = '🧹 Cleaning up...';
+                cleanupBtn.disabled = true;
+                
+                const result = await haAPI.cleanupDerivativeSensors(confirmDeleteAll);
+                
+                if (result.requires_confirmation) {
+                    showToast(result.message, 'warning', 6000);
+                } else {
+                    showToast(result.message, 'success', 4000);
+                }
+                
+                if (result.errors && result.errors.length > 0) {
+                    console.error('Cleanup errors:', result.errors);
+                    showToast(`Deleted ${result.deleted_count} sensors with ${result.errors.length} errors`, 'warning', 5000);
+                }
+                
+                cleanupBtn.textContent = '✓ Cleanup Complete!';
+                setTimeout(() => {
+                    cleanupBtn.textContent = '🧹 Cleanup Derivative Sensors';
+                    cleanupBtn.disabled = false;
+                }, 3000);
+            } catch (error) {
+                console.error('Failed to cleanup derivative sensors:', error);
+                showToast('Failed to cleanup derivative sensors', 'error');
+                cleanupBtn.textContent = '🧹 Cleanup Derivative Sensors';
+                cleanupBtn.disabled = false;
+            }
+        });
+    }
+
 }
 
 // Handle node settings for default schedule

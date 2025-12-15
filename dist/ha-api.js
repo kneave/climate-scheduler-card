@@ -484,6 +484,18 @@ class HomeAssistantAPI {
         }
     }
     
+    async cleanupDerivativeSensors(confirmDeleteAll = false) {
+        try {
+            const result = await this.callService('climate_scheduler', 'cleanup_derivative_sensors', {
+                confirm_delete_all: confirmDeleteAll
+            }, true);
+            return result?.response || result || {};
+        } catch (error) {
+            console.error('Failed to cleanup derivative sensors:', error);
+            throw error;
+        }
+    }
+    
     // Profile management methods
     async createProfile(targetId, profileName, isGroup = false) {
         return await this.callService('climate_scheduler', 'create_profile', {

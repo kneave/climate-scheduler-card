@@ -379,6 +379,17 @@ class ClimateSchedulerPanel extends HTMLElement {
                                             </label>
                                         </div>
                                     </div>
+                                    
+                                    <div class="settings-section">
+                                        <h4>Derivative Sensors</h4>
+                                        <p class="settings-description">Automatically create sensors to track heating/cooling rates for performance analysis</p>
+                                        <div class="setting-item">
+                                            <label>
+                                                <input type="checkbox" id="create-derivative-sensors" style="margin-right: 8px;"> Auto-create derivative sensors
+                                            </label>
+                                            <p class="settings-description" style="margin-top: 5px; font-size: 0.85rem;">When enabled, creates sensor.climate_scheduler_[name]_rate for each thermostat to track temperature change rate (°C/h)</p>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <!-- right column removed: min/max now inline in Graph Options -->
@@ -389,6 +400,7 @@ class ClimateSchedulerPanel extends HTMLElement {
                                 <button id="sync-all-menu" class="btn-secondary">⟲ Sync All Thermostats</button>
                                 <button id="reload-integration-menu" class="btn-secondary">🔄 Reload Integration (Dev)</button>
                                 <button id="convert-temperature-btn" class="btn-secondary">Convert All Schedules...</button>
+                                <button id="cleanup-derivative-sensors-btn" class="btn-secondary">🧹 Cleanup Derivative Sensors</button>
                                 <button id="reset-defaults" class="btn-secondary">Reset to Defaults</button>
                             </div>
                         </div>
