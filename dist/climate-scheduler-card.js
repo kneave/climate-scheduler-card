@@ -77,26 +77,35 @@ class ClimateSchedulerCard extends HTMLElement {
     try {
       const basePath = '/local/community/climate-scheduler-card';
       const scriptUrl = import.meta.url;
-      let version = new URL(scriptUrl).searchParams.get('hacstag');
+      const hacstag = new URL(scriptUrl).searchParams.get('hacstag');
+      let versionString = null;
+      let isDevDeployment = false;
       
-      // If no hacstag, load version from .version file
-      if (!version) {
-        try {
-          const response = await fetch(`${basePath}/.version`);
-          if (response.ok) {
-            const versionText = await response.text();
-            // .version file format: "tag,timestamp"
-            const parts = versionText.trim().split(',');
-            version = parts[0]; // Use the tag part
+      // Check .version file first - if it has a timestamp, prioritize it over hacstag
+      try {
+        const response = await fetch(`${basePath}/.version`);
+        if (response.ok) {
+          const versionText = (await response.text()).trim();
+          if (versionText.includes(',')) {
+            // Has timestamp - this is a dev deployment, use it instead of hacstag
+            versionString = versionText;
+            isDevDeployment = true;
+          } else if (!hacstag) {
+            // No timestamp and no hacstag - production release via script
+            versionString = versionText;
           }
-        } catch (e) {
-          console.warn('Failed to load .version file:', e);
         }
+      } catch (e) {
+        console.warn('Failed to load .version file:', e);
       }
-
+      
+      // If not a dev deployment and hacstag exists, use hacstag (HACS installation)
+      if (!versionString && hacstag) {
+        versionString = hacstag;
+      }
       
       if (!customElements.get('climate-scheduler-panel')) {
-        await import(`${basePath}/panel.js?v=${version}`);
+        await import(`${basePath}/panel.js?v=${versionString}`);
       }
     } catch (e) {
       this._container.innerHTML = `

@@ -22,13 +22,12 @@ const getVersion = () => {
     const version = new URL(scriptUrl).searchParams.get('v');
     if (!version) return null;
     
-    // For comma-separated format "tag,timestamp", use timestamp for cache busting
-    const parts = version.split(',');
-    if (parts.length >= 2) {
-        // Has timestamp - use it for cache busting (changes every deployment)
-        return parts[1];
+    // If version has comma (dev: "tag,timestamp"), use timestamp for cache busting
+    if (version.includes(',')) {
+        const parts = version.split(',');
+        return parts[1]; // timestamp
     }
-    // No comma means HACS version or old format - use as-is
+    // Otherwise use version as-is (HACS tag or production tag)
     return version;
 }
 
@@ -94,50 +93,23 @@ class ClimateSchedulerPanel extends HTMLElement {
             if (versionElement) {
                 try {
                     const scriptUrl = import.meta.url;
-                    const hacstag = new URL(scriptUrl).searchParams.get('hacstag');
                     const versionParam = new URL(scriptUrl).searchParams.get('v');
                     
                     let cardVersion = '';
                     
-                    if (hacstag) {
-                        // Installed via HACS - use hacstag (remove leading 'v' if present)
-                        const tag = hacstag.replace(/^v/, '');
-                        cardVersion = `v${tag}`;
-                    } else if (versionParam) {
-                        // Has version parameter - check if it's dev (has timestamp) or released (tag only)
-                        const parts = versionParam.split(',');
-                        const tag = (parts[0] || 'unknown').replace(/^v/, '');
-                        if (parts.length >= 2) {
-                            // Has timestamp - it's a dev build
+                    if (versionParam) {
+                        if (versionParam.includes(',')) {
+                            // Has timestamp - dev deployment: "tag,timestamp"
+                            const parts = versionParam.split(',');
+                            const tag = (parts[0] || 'unknown').replace(/^v/, '');
                             cardVersion = `v${tag} (dev)`;
                         } else {
-                            // Tag only - it's a release build
+                            // No timestamp - HACS or production: just tag
+                            const tag = versionParam.replace(/^v/, '');
                             cardVersion = `v${tag}`;
                         }
                     } else {
-                        // Try to load .version file to determine if it's dev or manual
-                        try {
-                            const basePath = '/local/community/climate-scheduler-card';
-                            const response = await fetch(`${basePath}/.version`);
-                            if (response.ok) {
-                                const versionContent = await response.text();
-                                const parts = versionContent.trim().split(',');
-                                const tag = (parts[0] || 'unknown').replace(/^v/, '');
-                                if (parts.length >= 2) {
-                                    // Has timestamp - dev build
-                                    cardVersion = `v${tag} (dev)`;
-                                } else {
-                                    // Tag only - release build
-                                    cardVersion = `v${tag}`;
-                                }
-                            } else {
-                                // No .version file - manual installation
-                                cardVersion = '(manual)';
-                            }
-                        } catch (e) {
-                            // Couldn't load .version - manual installation
-                            cardVersion = '(manual)';
-                        }
+                        cardVersion = '(manual)';
                     }
                     
                     versionElement.textContent = `Climate Scheduler Card ${cardVersion}`;
