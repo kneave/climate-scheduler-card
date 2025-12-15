@@ -8,8 +8,9 @@
 
 
 
-## [0.4.1] - 2025-12-15
-### Fixed
-- hopefully showing the correct version in the frontend for both parts
 
-## [0.4.0] - 2025-12-14
+## [0.5.0] - 2025-12-15
+### Added
+- Derivative temperature sensors added, not shown in the card but settings have been added
+
+## [0.4.1] - 2025-12-15
