@@ -40,6 +40,7 @@ function convertScheduleNodes(nodes, fromUnit, toUnit) {
     }));
 }
 let allGroups = {}; // Store all groups data
+let allEntities = {}; // Store all entities data with their schedules
 let currentGroup = null; // Currently selected group
 let tooltipMode = 'history'; // 'history' or 'cursor'
 let debugPanelEnabled = localStorage.getItem('debugPanelEnabled') === 'true'; // Debug panel visibility
