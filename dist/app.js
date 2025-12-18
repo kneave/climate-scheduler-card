@@ -2152,11 +2152,8 @@ function copySchedule() {
         // Deep copy the nodes
         scheduleClipboard = nodes.map(n => ({...n}));
         
-        // Enable paste button
-        const pasteBtn = getDocumentRoot().querySelector('#paste-schedule-btn');
-        if (pasteBtn) {
-            pasteBtn.disabled = false;
-        }
+        // Enable paste buttons
+        updatePasteButtonState();
         
         // Visual feedback
         const copyBtn = getDocumentRoot().querySelector('#copy-schedule-btn');
