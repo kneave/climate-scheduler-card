@@ -1,5 +1,5 @@
 ﻿{
     "name":  "Climate Scheduler Card",
-    "version":  "0.5.1",
+    "version":  "0.5.2",
     "description":  "A custom Lovelace card for the Climate Scheduler integration"
 }
