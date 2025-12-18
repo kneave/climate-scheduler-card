@@ -475,7 +475,7 @@ async function editGroupSchedule(groupName, day = null) {
     const svg = editor.querySelector('#temperature-graph');
     
     // Set initial nodes
-    graph.setNodes(currentSchedule.length > 0 ? currentSchedule : [{ time: '00:00', temp: 18 }]);
+    graph.setNodes(currentSchedule);
     
     // Always attach the permanent nodesChanged listener for auto-save
     if (svg) {
@@ -958,9 +958,7 @@ async function toggleEntityInclusion(entityId, enable = true) {
             
             if (!schedule || !schedule.nodes || schedule.nodes.length === 0) {
                 // Entity has no schedule, initialize with default
-                const defaultSchedule = defaultScheduleSettings.length > 0 
-                    ? defaultScheduleSettings.map(node => ({...node}))
-                    : [{ time: '00:00', temp: 18 }];
+                const defaultSchedule = defaultScheduleSettings.map(node => ({...node}));
                 
                 await haAPI.setSchedule(entityId, defaultSchedule, 'all_days', 'all_days');
                 
@@ -2199,8 +2197,8 @@ async function clearScheduleForEntity(entityId) {
         // Reset to user-configured default schedule
         const defaultSchedule = defaultScheduleSettings.map(node => ({...node}));
         
-        // Save default schedule to HA
-        await haAPI.setSchedule(entityId, defaultSchedule);
+        // Save default schedule to HA with current day and mode
+        await haAPI.setSchedule(entityId, defaultSchedule, currentDay, currentScheduleMode);
         
         // Update local state
         entitySchedules.set(entityId, defaultSchedule);
@@ -2213,7 +2211,7 @@ async function clearScheduleForEntity(entityId) {
         // Update current schedule reference
         currentSchedule = defaultSchedule;
         
-        await saveSchedule();
+        showToast('Schedule cleared', 'success');
     } catch (error) {
         console.error('Failed to clear schedule:', error);
         showToast('Failed to clear schedule. Please try again.', 'error');
@@ -2336,14 +2334,14 @@ async function loadEntitySchedule(entityId, day = null) {
             // Update UI
             updateScheduleModeUI();
         //
-            graph.setNodes(nodes.length > 0 ? nodes : [{ time: '00:00', temp: 18 }]);
+            graph.setNodes(nodes);
             getDocumentRoot().querySelector('#schedule-enabled').checked = schedule.enabled !== false;
         } else {
             // New schedule - set defaults
             currentScheduleMode = 'all_days';
             currentDay = 'all_days';
             updateScheduleModeUI();
-            graph.setNodes([{ time: '00:00', temp: 18 }]);
+            graph.setNodes([]);
             getDocumentRoot().querySelector('#schedule-enabled').checked = true;
         }
         
@@ -2628,7 +2626,7 @@ async function switchScheduleMode(newMode) {
         //
         
         // Update graph with new nodes
-        graph.setNodes(currentSchedule.length > 0 ? currentSchedule : [{ time: '00:00', temp: 18 }]);
+        graph.setNodes(currentSchedule);
         
         // Clear loading flag after a delay
         setTimeout(() => {
@@ -2691,7 +2689,7 @@ async function switchDay(day) {
         //
         
         // Update graph with new nodes
-        graph.setNodes(currentSchedule.length > 0 ? currentSchedule : [{ time: '00:00', temp: 18 }]);
+        graph.setNodes(currentSchedule);
         
         // Clear loading flag after a delay
         setTimeout(() => {
@@ -3362,7 +3360,7 @@ async function toggleEntityInclusion(entityId, include) {
             }
             
             // Use existing schedule or create default
-            const scheduleToUse = existingSchedule || [{ time: "00:00", temp: 18 }];
+            const scheduleToUse = existingSchedule || [];
             
             // Add to local state immediately with a unique copy for each entity
             entitySchedules.set(entityId, JSON.parse(JSON.stringify(scheduleToUse)));
