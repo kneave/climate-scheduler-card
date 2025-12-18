@@ -4089,11 +4089,7 @@ setInterval(() => {
 // ===== Settings Panel =====
 
 // Default schedule settings
-let defaultScheduleSettings = [
-    { time: '00:00', temp: 18.0 },
-    { time: '07:00', temp: 21.0 },
-    { time: '23:00', temp: 18.0 }
-];
+let defaultScheduleSettings = [];
 
 let defaultScheduleGraph = null;
 // Global min/max settings (populated from loadSettings)
@@ -4473,11 +4469,7 @@ async function setupSettingsPanel() {
     if (resetBtn) {
         resetBtn.addEventListener('click', async () => {
             if (confirm('Reset to default schedule settings?')) {
-                defaultScheduleSettings = [
-                    { time: '00:00', temp: 18.0 },
-                    { time: '07:00', temp: 21.0 },
-                    { time: '23:00', temp: 18.0 }
-                ];
+                defaultScheduleSettings = [];
                 
                 if (defaultScheduleGraph) {
                     defaultScheduleGraph.setNodes(defaultScheduleSettings);
@@ -4488,6 +4480,28 @@ async function setupSettingsPanel() {
                     resetBtn.textContent = '✓ Reset!';
                     setTimeout(() => {
                         resetBtn.textContent = 'Reset to Defaults';
+                    }, 2000);
+                }
+            }
+        });
+    }
+    
+    // Clear default schedule button
+    const clearDefaultScheduleBtn = getDocumentRoot().querySelector('#clear-default-schedule-btn');
+    if (clearDefaultScheduleBtn) {
+        clearDefaultScheduleBtn.addEventListener('click', async () => {
+            if (confirm('Clear the default schedule? All nodes will be removed.')) {
+                defaultScheduleSettings = [];
+                
+                if (defaultScheduleGraph) {
+                    defaultScheduleGraph.setNodes(defaultScheduleSettings);
+                }
+                
+                const success = await saveSettings();
+                if (success) {
+                    clearDefaultScheduleBtn.textContent = '✓ Cleared!';
+                    setTimeout(() => {
+                        clearDefaultScheduleBtn.textContent = 'Clear Schedule';
                     }, 2000);
                 }
             }

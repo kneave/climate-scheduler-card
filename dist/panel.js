@@ -319,6 +319,10 @@ class ClimateSchedulerPanel extends HTMLElement {
                                             <svg id="default-schedule-graph" class="temperature-graph"></svg>
                                         </div>
                                         
+                                        <div style="margin-top: 8px;">
+                                            <button id="clear-default-schedule-btn" class="btn-danger-outline">Clear Schedule</button>
+                                        </div>
+                                        
                                         <div id="default-node-settings-panel" class="node-settings-panel" style="display: none;">
                                             <div style="display: flex; justify-content: space-between; align-items: center;">
                                                 <h4>Node Settings</h4>
