@@ -238,6 +238,9 @@ async function loadGroups() {
         // Render groups section
         renderGroups();
         
+        // Render unmonitored entities section
+        renderIgnoredEntities();
+        
         // Re-render entity list now that groups are loaded
         // This will hide entities that are in groups
         await renderEntityList();
@@ -269,7 +272,14 @@ function renderGroups() {
     // Clear existing groups
     groupsList.innerHTML = '';
     
-    const groupNames = Object.keys(allGroups);
+    // Filter out ignored single-entity groups
+    const groupNames = Object.keys(allGroups).filter(groupName => {
+        const groupData = allGroups[groupName];
+        // Hide single-entity groups that are marked as ignored
+        const isSingleEntity = groupData.entities && groupData.entities.length === 1;
+        const isIgnored = groupData.ignored === true;
+        return !(isSingleEntity && isIgnored);
+    });
     
     // Update count
     if (groupsCount) {
@@ -305,6 +315,103 @@ function renderGroups() {
     });
 }
 
+// Render unmonitored entities in the unmonitored section
+function renderIgnoredEntities() {
+    const ignoredContainer = getDocumentRoot().querySelector('#ignored-entities-container');
+    const ignoredCount = getDocumentRoot().querySelector('#ignored-count');
+    if (!ignoredContainer) return;
+    
+    console.log('renderIgnoredEntities - Total climate entities:', climateEntities.length);
+    console.log('renderIgnoredEntities - All groups:', allGroups);
+    
+    // Find all climate entities that are NOT in a monitored group
+    // This includes: 1) entities not in any group, 2) entities in single-entity groups with ignored=true
+    const unmonitoredEntities = climateEntities.filter(entity => {
+        const entityId = entity.entity_id;
+        
+        // Check if entity is in any group
+        let isInMonitoredGroup = false;
+        for (const [groupName, groupData] of Object.entries(allGroups)) {
+            if (groupData.entities && groupData.entities.includes(entityId)) {
+                // Found the entity in a group
+                const isSingleEntity = groupData.entities.length === 1;
+                const isIgnored = groupData.ignored === true;
+                
+                console.log(`Entity ${entityId} in group ${groupName}: isSingleEntity=${isSingleEntity}, isIgnored=${isIgnored}`);
+                
+                // If it's in a single-entity group that's ignored, it's unmonitored
+                // If it's in any other group (multi-entity or monitored single-entity), it's monitored
+                if (!isSingleEntity || !isIgnored) {
+                    isInMonitoredGroup = true;
+                }
+                break;
+            }
+        }
+        
+        console.log(`Entity ${entityId}: isInMonitoredGroup=${isInMonitoredGroup}`);
+        
+        // Include if NOT in a monitored group
+        return !isInMonitoredGroup;
+    });
+    
+    console.log('renderIgnoredEntities - Unmonitored entities:', unmonitoredEntities.length, unmonitoredEntities.map(e => e.entity_id));
+    
+    // Update count
+    if (ignoredCount) {
+        ignoredCount.textContent = unmonitoredEntities.length;
+    }
+    
+    // Clear existing content
+    ignoredContainer.innerHTML = '';
+    
+    if (unmonitoredEntities.length === 0) {
+        ignoredContainer.innerHTML = '<p style="color: var(--secondary-text-color); padding: 16px; text-align: center;">No unmonitored entities</p>';
+        return;
+    }
+    
+    // Render each unmonitored entity
+    unmonitoredEntities.forEach(entity => {
+        const entityId = entity.entity_id;
+        const friendlyName = entity.attributes?.friendly_name || entityId;
+        
+        console.log(`Rendering unmonitored entity: ${entityId} (${friendlyName})`);
+        
+        const item = document.createElement('div');
+        item.className = 'ignored-entity-item';
+        item.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); cursor: pointer;';
+        
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = friendlyName;
+        nameSpan.style.flex = '1';
+        
+        const unignoreBtn = document.createElement('button');
+        unignoreBtn.textContent = 'Monitor';
+        unignoreBtn.className = 'btn-secondary-outline';
+        unignoreBtn.style.cssText = 'padding: 4px 12px; font-size: 0.85rem;';
+        unignoreBtn.onclick = async (e) => {
+            e.stopPropagation();
+            if (confirm(`Start monitoring ${friendlyName}?\n\nThis entity will be managed by the scheduler again.`)) {
+                try {
+                    await haAPI.setIgnored(entityId, false);
+                    showToast(`${friendlyName} is now monitored`, 'success');
+                    // Reload groups to update the display
+                    await loadGroups();
+                } catch (error) {
+                    console.error('Failed to monitor entity:', error);
+                    showToast('Failed to monitor entity: ' + error.message, 'error');
+                }
+            }
+        };
+        
+        item.appendChild(nameSpan);
+        item.appendChild(unignoreBtn);
+        ignoredContainer.appendChild(item);
+        console.log(`Appended item for ${entityId} to container`);
+    });
+    
+    console.log(`Total children in ignoredContainer: ${ignoredContainer.children.length}`);
+}
+
 // Create a group container element
 function createGroupContainer(groupName, groupData) {
     const container = document.createElement('div');
@@ -327,7 +434,17 @@ function createGroupContainer(groupName, groupData) {
     
     const title = document.createElement('span');
     title.className = 'group-title';
-    title.textContent = groupName;
+    
+    // For single-entity groups, display the entity's friendly name
+    const isSingleEntity = groupData.entities && groupData.entities.length === 1;
+    if (isSingleEntity) {
+        const entityId = groupData.entities[0];
+        const entity = climateEntities.find(e => e.entity_id === entityId);
+        const friendlyName = entity?.attributes?.friendly_name || entityId;
+        title.textContent = friendlyName;
+    } else {
+        title.textContent = groupName;
+    }
     
     const count = document.createElement('span');
     count.className = 'group-count';
@@ -338,6 +455,36 @@ function createGroupContainer(groupName, groupData) {
     leftSide.appendChild(count);
     
     header.appendChild(leftSide);
+    
+    // Add rename button for multi-entity groups (not single-entity groups)
+    if (!isSingleEntity) {
+        const actions = document.createElement('div');
+        actions.className = 'group-actions';
+        actions.style.cssText = 'display: flex; gap: 4px; align-items: center;';
+        
+        const renameBtn = document.createElement('button');
+        renameBtn.textContent = '✎';
+        renameBtn.className = 'btn-icon';
+        renameBtn.title = 'Rename group';
+        renameBtn.style.cssText = 'padding: 4px 8px; font-size: 1rem; background: none; border: none; cursor: pointer; color: var(--text-secondary);';
+        renameBtn.onclick = async (e) => {
+            e.stopPropagation();
+            const newName = prompt(`Rename group "${groupName}" to:`, groupName);
+            if (newName && newName.trim() !== '' && newName !== groupName) {
+                try {
+                    await haAPI.renameGroup(groupName, newName.trim());
+                    showToast(`Renamed group to: ${newName}`, 'success');
+                    await loadGroups();
+                } catch (error) {
+                    console.error('Failed to rename group:', error);
+                    showToast('Failed to rename group: ' + error.message, 'error');
+                }
+            }
+        };
+        
+        actions.appendChild(renameBtn);
+        header.appendChild(actions);
+    }
     
     // Toggle collapse/expand and edit schedule on header click
     header.onclick = (e) => {
@@ -533,6 +680,10 @@ function createSettingsPanel(groupData, editor) {
     settingsPanel.className = 'schedule-settings-panel collapsed';
     settingsPanel.style.display = 'none';
     
+    // Check if this is a single-entity group (for ignore button visibility)
+    const isSingleEntityGroup = groupData && groupData.entities && groupData.entities.length === 1;
+    console.log('Creating settings panel, isSingleEntityGroup:', isSingleEntityGroup, 'groupData:', groupData);
+    
     // Add editor controls (buttons)
     let controlsHTML = `
         <div class="editor-controls">
@@ -540,8 +691,15 @@ function createSettingsPanel(groupData, editor) {
             <button id="copy-schedule-btn" class="btn-secondary-outline schedule-btn" title="Copy current schedule">Copy Schedule</button>
             <button id="paste-schedule-btn" class="btn-secondary-outline schedule-btn" title="Paste copied schedule" disabled>Paste Schedule</button>
             <button id="advance-schedule-btn" class="btn-secondary-outline schedule-btn" title="Advance to next scheduled node">Advance</button>
-            <button id="clear-advance-history-btn" class="btn-secondary-outline schedule-btn" title="Clear advance history markers">Clear Advance History</button>
-            <button id="ignore-entity-btn" class="btn-secondary-outline schedule-btn" title="Disable this thermostat">Ignore</button>
+            <button id="clear-advance-history-btn" class="btn-secondary-outline schedule-btn" title="Clear advance history markers">Clear Advance History</button>`;
+    
+    // Only show unmonitor button for single-entity groups
+    if (isSingleEntityGroup) {
+        console.log('Adding unmonitor button to HTML');
+        controlsHTML += `<button id="ignore-entity-btn" class="btn-secondary-outline schedule-btn" title="Stop monitoring this thermostat">Unmonitor</button>`;
+    }
+    
+    controlsHTML += `
             <button id="clear-schedule-btn" class="btn-danger-outline schedule-btn" title="Clear entire schedule">Clear Schedule</button>
             <button id="save-schedule-btn" class="btn-primary schedule-btn" title="Save schedule">Save</button>`;
     
@@ -633,6 +791,7 @@ function createSettingsPanel(groupData, editor) {
     
     // Connect undo button to graph and add delete group handler
     setTimeout(() => {
+        console.log('Settings panel setTimeout running, groupData:', groupData);
         const undoBtn = container.querySelector('#undo-btn');
         if (undoBtn && graph) {
             graph.setUndoButton(undoBtn);
@@ -640,6 +799,7 @@ function createSettingsPanel(groupData, editor) {
         
         // Add delete group button handler if this is a group
         if (groupData) {
+            console.log('Group data exists, entities:', groupData.entities);
             const deleteGroupBtn = container.querySelector('#delete-group-btn');
             if (deleteGroupBtn) {
                 deleteGroupBtn.onclick = () => {
@@ -1140,12 +1300,9 @@ async function renderEntityList() {
         // Query from panel element if available, fallback to document
         const root = getDocumentRoot();
         const entityList = root.querySelector('#entity-list');
-        const ignoredEntityContainer = root.querySelector('#ignored-entities-container');
         const activeCount = root.querySelector('#active-count');
-        const ignoredCount = root.querySelector('#ignored-count');
         
         entityList.innerHTML = '';
-        ignoredEntityContainer.innerHTML = '';
         
         if (climateEntities.length === 0) {
             entityList.innerHTML = '<p style="color: #b0b0b0; padding: 20px; text-align: center;">No climate entities found</p>';
@@ -1164,11 +1321,6 @@ async function renderEntityList() {
         const includedEntities = new Set(entitySchedules.keys());
     
         let activeEntitiesCount = 0;
-        let ignoredEntitiesCount = 0;
-        
-        // Get filter value
-        const filterInput = getDocumentRoot().querySelector('#ignored-filter');
-        const filterText = filterInput ? filterInput.value.toLowerCase() : '';
         
         climateEntities.forEach(entity => {
             // Skip entities that are in groups
@@ -1177,23 +1329,13 @@ async function renderEntityList() {
             }
             
             const isIncluded = includedEntities.has(entity.entity_id);
-            const card = createEntityCard(entity, isIncluded);
             
+            // Only render active (monitored) entities in this list
+            // Unmonitored entities are handled by renderIgnoredEntities()
             if (isIncluded) {
+                const card = createEntityCard(entity, isIncluded);
                 entityList.appendChild(card);
                 activeEntitiesCount++;
-                
-                // Update selection state if this is the current entity
-                if (currentEntityId === entity.entity_id) {
-                    card.classList.add('selected');
-                }
-            } else {
-                // Apply filter to ignored entities
-                const entityName = (entity.attributes.friendly_name || entity.entity_id).toLowerCase();
-                if (!filterText || entityName.includes(filterText)) {
-                    ignoredEntityContainer.appendChild(card);
-                }
-                ignoredEntitiesCount++;
                 
                 // Update selection state if this is the current entity
                 if (currentEntityId === entity.entity_id) {
@@ -1202,9 +1344,8 @@ async function renderEntityList() {
             }
         });
         
-        // Update counts
+        // Update active count
         activeCount.textContent = activeEntitiesCount;
-        ignoredCount.textContent = ignoredEntitiesCount;
         
         // Show/hide sections based on content
         const activeSection = getDocumentRoot().querySelector('.active-section');
@@ -1617,21 +1758,46 @@ function attachEditorEventListeners(editorElement) {
         };
     }
     
-    // Ignore button
+    // Ignore button (Unmonitor button for single-entity groups)
     const ignoreBtn = editorElement.querySelector('#ignore-entity-btn');
+    console.log('attachEditorEventListeners - Looking for unmonitor button, found:', !!ignoreBtn);
     if (ignoreBtn) {
+        console.log('Attaching unmonitor button handler');
         ignoreBtn.onclick = async (event) => {
-            if (!currentEntityId) {
+            // For single-entity groups, get entity from the group
+            let entityIdToUnmonitor = currentEntityId;
+            if (!entityIdToUnmonitor && currentGroup) {
+                const groupData = allGroups[currentGroup];
+                if (groupData && groupData.entities && groupData.entities.length === 1) {
+                    entityIdToUnmonitor = groupData.entities[0];
+                }
+            }
+            
+            if (!entityIdToUnmonitor) {
+                console.error('No entity ID found to unmonitor');
                 return;
             }
             
-            try {
-                await toggleEntityInclusion(currentEntityId, false);
-                
-                collapseAllEditors();
-                currentEntityId = null;
-            } catch (error) {
-                console.error('Error during ignore operation:', error);
+            console.log('Unmonitoring entity:', entityIdToUnmonitor);
+            
+            if (confirm(`Stop monitoring ${entityIdToUnmonitor}?\n\nUnmonitored entities will not be managed by the scheduler.`)) {
+                try {
+                    console.log('Calling setIgnored service for:', entityIdToUnmonitor);
+                    await haAPI.setIgnored(entityIdToUnmonitor, true);
+                    console.log('setIgnored service completed successfully');
+                    showToast(`${entityIdToUnmonitor} is now unmonitored`, 'success');
+                    // Reload groups to update the display
+                    await loadGroups();
+                    // Close the editor
+                    collapseAllEditors();
+                    currentEntityId = null;
+                    currentGroup = null;
+                } catch (error) {
+                    console.error('Failed to unmonitor entity:', error);
+                    showToast('Failed to unmonitor entity: ' + error.message, 'error');
+                }
+            } else {
+                console.log('User cancelled unmonitor action');
             }
         };
     }

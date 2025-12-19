@@ -191,7 +191,7 @@ class ClimateSchedulerPanel extends HTMLElement {
                         <div class="ignored-section">
                             <button id="toggle-ignored" class="ignored-toggle">
                                 <span class="toggle-icon">▶</span>
-                                <span class="toggle-text">Ignored (<span id="ignored-count">0</span>)</span>
+                                <span class="toggle-text">Unmonitored (<span id="ignored-count">0</span>)</span>
                             </button>
                             <div id="ignored-entity-list" class="entity-list ignored-list" style="display: none;">
                                 <div class="filter-box">

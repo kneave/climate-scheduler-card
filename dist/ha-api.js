@@ -367,6 +367,13 @@ class HomeAssistantAPI {
         });
     }
     
+    async renameGroup(oldName, newName) {
+        return await this.callService('climate_scheduler', 'rename_group', {
+            old_name: oldName,
+            new_name: newName
+        });
+    }
+    
     async addToGroup(groupName, entityId) {
         return await this.callService('climate_scheduler', 'add_to_group', {
             group_name: groupName,

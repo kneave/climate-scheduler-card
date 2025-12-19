@@ -404,9 +404,8 @@ climate-scheduler-panel {
 
 /* Ignored entities list container should fill width under filter */
 #ignored-entities-container {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 12px;
+    display: flex;
+    flex-direction: column;
     width: 100%;
 }
 
