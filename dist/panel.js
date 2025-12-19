@@ -172,20 +172,13 @@ class ClimateSchedulerPanel extends HTMLElement {
                 <div class="container">
                     <section class="entity-selector">
                         <div class="groups-section">
-                            <h3 class="section-title">Groups (<span id="groups-count">0</span>)</h3>
+                            <h3 class="section-title">Monitored (<span id="groups-count">0</span>)</h3>
                             <div id="groups-list" class="groups-list">
                                 <!-- Dynamically populated with groups -->
                             </div>
                             <button id="create-group-btn" class="btn-primary" style="margin-top: 10px; width: 100%;">
                                 + Create New Group
                             </button>
-                        </div>
-                        
-                        <div class="active-section">
-                            <h3 class="section-title">Active (<span id="active-count">0</span>)</h3>
-                            <div id="entity-list" class="entity-list">
-                                <!-- Dynamically populated with active entities -->
-                            </div>
                         </div>
                         
                         <div class="ignored-section">

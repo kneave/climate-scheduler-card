@@ -10,7 +10,6 @@ function getDocumentRoot() {
 
 let haAPI;
 let graph;
-let currentEntityId = null;
 let climateEntities = [];
 let entitySchedules = new Map(); // Track which entities have schedules locally
 let temperatureUnit = '°C'; // Default to Celsius, updated from HA config
@@ -321,9 +320,6 @@ function renderIgnoredEntities() {
     const ignoredCount = getDocumentRoot().querySelector('#ignored-count');
     if (!ignoredContainer) return;
     
-    console.log('renderIgnoredEntities - Total climate entities:', climateEntities.length);
-    console.log('renderIgnoredEntities - All groups:', allGroups);
-    
     // Find all climate entities that are NOT in a monitored group
     // This includes: 1) entities not in any group, 2) entities in single-entity groups with ignored=true
     const unmonitoredEntities = climateEntities.filter(entity => {
@@ -337,8 +333,6 @@ function renderIgnoredEntities() {
                 const isSingleEntity = groupData.entities.length === 1;
                 const isIgnored = groupData.ignored === true;
                 
-                console.log(`Entity ${entityId} in group ${groupName}: isSingleEntity=${isSingleEntity}, isIgnored=${isIgnored}`);
-                
                 // If it's in a single-entity group that's ignored, it's unmonitored
                 // If it's in any other group (multi-entity or monitored single-entity), it's monitored
                 if (!isSingleEntity || !isIgnored) {
@@ -348,13 +342,9 @@ function renderIgnoredEntities() {
             }
         }
         
-        console.log(`Entity ${entityId}: isInMonitoredGroup=${isInMonitoredGroup}`);
-        
         // Include if NOT in a monitored group
         return !isInMonitoredGroup;
     });
-    
-    console.log('renderIgnoredEntities - Unmonitored entities:', unmonitoredEntities.length, unmonitoredEntities.map(e => e.entity_id));
     
     // Update count
     if (ignoredCount) {
@@ -373,8 +363,6 @@ function renderIgnoredEntities() {
     unmonitoredEntities.forEach(entity => {
         const entityId = entity.entity_id;
         const friendlyName = entity.attributes?.friendly_name || entityId;
-        
-        console.log(`Rendering unmonitored entity: ${entityId} (${friendlyName})`);
         
         const item = document.createElement('div');
         item.className = 'ignored-entity-item';
@@ -406,10 +394,7 @@ function renderIgnoredEntities() {
         item.appendChild(nameSpan);
         item.appendChild(unignoreBtn);
         ignoredContainer.appendChild(item);
-        console.log(`Appended item for ${entityId} to container`);
     });
-    
-    console.log(`Total children in ignoredContainer: ${ignoredContainer.children.length}`);
 }
 
 // Create a group container element
@@ -523,9 +508,8 @@ async function editGroupSchedule(groupName, day = null) {
     // Collapse all other editors first
     collapseAllEditors();
     
-    // Set current group and clear entity selection
+    // Set current group
     currentGroup = groupName;
-    currentEntityId = null;
     
     // Load schedule mode and day
     currentScheduleMode = groupData.schedule_mode || 'all_days';
@@ -595,7 +579,6 @@ async function editGroupSchedule(groupName, day = null) {
     }
     
     // Load nodes for the selected day
-    console.log('editGroupSchedule - Loading nodes for day:', currentDay, 'Available schedules:', Object.keys(groupData.schedules || {}));
     let nodes = [];
     if (groupData.schedules && groupData.schedules[currentDay]) {
         nodes = groupData.schedules[currentDay];
@@ -682,7 +665,6 @@ function createSettingsPanel(groupData, editor) {
     
     // Check if this is a single-entity group (for ignore button visibility)
     const isSingleEntityGroup = groupData && groupData.entities && groupData.entities.length === 1;
-    console.log('Creating settings panel, isSingleEntityGroup:', isSingleEntityGroup, 'groupData:', groupData);
     
     // Add editor controls (buttons)
     let controlsHTML = `
@@ -695,7 +677,6 @@ function createSettingsPanel(groupData, editor) {
     
     // Only show unmonitor button for single-entity groups
     if (isSingleEntityGroup) {
-        console.log('Adding unmonitor button to HTML');
         controlsHTML += `<button id="ignore-entity-btn" class="btn-secondary-outline schedule-btn" title="Stop monitoring this thermostat">Unmonitor</button>`;
     }
     
@@ -791,7 +772,6 @@ function createSettingsPanel(groupData, editor) {
     
     // Connect undo button to graph and add delete group handler
     setTimeout(() => {
-        console.log('Settings panel setTimeout running, groupData:', groupData);
         const undoBtn = container.querySelector('#undo-btn');
         if (undoBtn && graph) {
             graph.setUndoButton(undoBtn);
@@ -799,7 +779,6 @@ function createSettingsPanel(groupData, editor) {
         
         // Add delete group button handler if this is a group
         if (groupData) {
-            console.log('Group data exists, entities:', groupData.entities);
             const deleteGroupBtn = container.querySelector('#delete-group-btn');
             if (deleteGroupBtn) {
                 deleteGroupBtn.onclick = () => {
@@ -821,18 +800,13 @@ function createSettingsPanel(groupData, editor) {
 
 // Setup profile management event handlers
 async function setupProfileHandlers(container, groupData) {
-    const isGroup = !!groupData;
-    const targetId = isGroup ? currentGroup : currentEntityId;
-    
-    console.log('setupProfileHandlers - isGroup:', isGroup, 'targetId:', targetId, 'groupData:', groupData);
-    
-    if (!targetId) {
-        console.warn('setupProfileHandlers - no targetId, aborting');
+    if (!groupData || !currentGroup) {
+        console.warn('setupProfileHandlers - no group data, aborting');
         return;
     }
     
     // Load and populate profiles
-    await loadProfiles(container, targetId, isGroup);
+    await loadProfiles(container, currentGroup, true);
     
     // Profile dropdown change handler
     const profileDropdown = container.querySelector('#profile-dropdown');
@@ -840,7 +814,7 @@ async function setupProfileHandlers(container, groupData) {
         profileDropdown.onchange = async () => {
             const selectedProfile = profileDropdown.value;
             try {
-                await haAPI.setActiveProfile(targetId, selectedProfile, isGroup);
+                await haAPI.setActiveProfile(currentGroup, selectedProfile, true);
                 showToast(`Switched to profile: ${selectedProfile}`, 'success');
                 // Reload the editor with the new profile
                 if (isGroup) {
@@ -925,10 +899,8 @@ async function setupProfileHandlers(container, groupData) {
 
 // Load and populate profiles dropdown
 async function loadProfiles(container, targetId, isGroup) {
-    console.log('loadProfiles - targetId:', targetId, 'isGroup:', isGroup);
     try {
         const result = await haAPI.getProfiles(targetId, isGroup);
-        console.log('loadProfiles - result:', result);
         const profiles = result.profiles || {};
         const activeProfile = result.active_profile || 'Default';
         
@@ -1205,12 +1177,42 @@ function showMoveToGroupModal(currentGroupName, entityId) {
     // Populate group select (excluding current group)
     select.innerHTML = '<option value="">Select a group...</option>';
     Object.keys(allGroups).forEach(groupName => {
-        if (groupName !== currentGroupName) {
-            const option = document.createElement('option');
-            option.value = groupName;
-            option.textContent = groupName;
-            select.appendChild(option);
+        if (groupName === currentGroupName) {
+            return; // Skip current group
         }
+        
+        const groupData = allGroups[groupName];
+        
+        // Skip ignored/unmonitored groups
+        const isIgnored = groupData.ignored === true;
+        if (isIgnored) {
+            return;
+        }
+        
+        // Skip disabled groups
+        const isEnabled = groupData.enabled !== false;
+        if (!isEnabled) {
+            return;
+        }
+        
+        // For single-entity groups, use the entity's friendly name
+        const isSingleEntity = groupData.entities && groupData.entities.length === 1;
+        let displayName = groupName;
+        if (isSingleEntity) {
+            const targetEntityId = groupData.entities[0];
+            const entity = climateEntities.find(e => e.entity_id === targetEntityId);
+            if (entity && entity.attributes?.friendly_name) {
+                displayName = entity.attributes.friendly_name;
+            } else {
+                // Fallback to entity_id without the domain prefix
+                displayName = targetEntityId.split('.')[1]?.replace(/_/g, ' ') || targetEntityId;
+            }
+        }
+        
+        const option = document.createElement('option');
+        option.value = groupName;
+        option.textContent = displayName;
+        select.appendChild(option);
     });
     
     // Clear new group input
@@ -1235,9 +1237,37 @@ function showAddToGroupModal(entityId) {
     // Populate group select
     select.innerHTML = '<option value="">Select a group...</option>';
     Object.keys(allGroups).forEach(groupName => {
+        const groupData = allGroups[groupName];
+        
+        // Skip ignored/unmonitored groups
+        const isIgnored = groupData.ignored === true;
+        if (isIgnored) {
+            return; // Skip this group
+        }
+        
+        // Skip disabled groups
+        const isEnabled = groupData.enabled !== false;
+        if (!isEnabled) {
+            return; // Skip this group
+        }
+        
+        // For single-entity groups, use the entity's friendly name
+        const isSingleEntity = groupData.entities && groupData.entities.length === 1;
+        let displayName = groupName;
+        if (isSingleEntity) {
+            const entityId = groupData.entities[0];
+            const entity = climateEntities.find(e => e.entity_id === entityId);
+            if (entity && entity.attributes?.friendly_name) {
+                displayName = entity.attributes.friendly_name;
+            } else {
+                // Fallback to entity_id without the domain prefix
+                displayName = entityId.split('.')[1]?.replace(/_/g, ' ') || entityId;
+            }
+        }
+        
         const option = document.createElement('option');
         option.value = groupName;
-        option.textContent = groupName;
+        option.textContent = displayName;
         select.appendChild(option);
     });
     
@@ -1294,192 +1324,11 @@ async function toggleGroupEnabled(groupName, enabled) {
     }
 }
 
-// Render entity list
+// Render entity list (deprecated - all entities are now in groups)
 async function renderEntityList() {
-    try {
-        // Query from panel element if available, fallback to document
-        const root = getDocumentRoot();
-        const entityList = root.querySelector('#entity-list');
-        const activeCount = root.querySelector('#active-count');
-        
-        entityList.innerHTML = '';
-        
-        if (climateEntities.length === 0) {
-            entityList.innerHTML = '<p style="color: #b0b0b0; padding: 20px; text-align: center;">No climate entities found</p>';
-            return;
-        }
-        
-        // Get set of entities that are in groups (should be hidden from this list)
-        const entitiesInGroups = new Set();
-        Object.values(allGroups).forEach(group => {
-            if (group.entities) {
-                group.entities.forEach(entityId => entitiesInGroups.add(entityId));
-            }
-        });
-        
-        // Use local state to check which entities are included
-        const includedEntities = new Set(entitySchedules.keys());
-    
-        let activeEntitiesCount = 0;
-        
-        climateEntities.forEach(entity => {
-            // Skip entities that are in groups
-            if (entitiesInGroups.has(entity.entity_id)) {
-                return;
-            }
-            
-            const isIncluded = includedEntities.has(entity.entity_id);
-            
-            // Only render active (monitored) entities in this list
-            // Unmonitored entities are handled by renderIgnoredEntities()
-            if (isIncluded) {
-                const card = createEntityCard(entity, isIncluded);
-                entityList.appendChild(card);
-                activeEntitiesCount++;
-                
-                // Update selection state if this is the current entity
-                if (currentEntityId === entity.entity_id) {
-                    card.classList.add('selected');
-                }
-            }
-        });
-        
-        // Update active count
-        activeCount.textContent = activeEntitiesCount;
-        
-        // Show/hide sections based on content
-        const activeSection = getDocumentRoot().querySelector('.active-section');
-        const ignoredSection = getDocumentRoot().querySelector('.ignored-section');
-        
-        if (!activeSection) {
-            alert('ERROR: active-section element not found!');
-            return;
-        }
-        
-        // Hide Active section if there are no ungrouped active entities
-        if (activeEntitiesCount === 0) {
-            activeSection.style.display = 'none';
-        } else {
-            activeSection.style.display = 'block';
-        }
-        
-        // Ignored section remains available for enabling entities when present
-        if (ignoredSection) {
-            ignoredSection.style.display = 'block';
-        }
-        
-        // No message needed if active section is hidden
-    
-    } catch (error) {
-        console.error('ERROR in renderEntityList:', error);
-        console.error('Error stack:', error.stack);
-        throw error;
-    }
-}
-
-// Create entity card element
-function createEntityCard(entity, isIncluded = false) {
-    const card = document.createElement('div');
-    card.className = 'entity-card';
-    card.dataset.entityId = entity.entity_id;
-    
-    if (currentEntityId === entity.entity_id) {
-        card.classList.add('selected');
-    }
-    
-    if (!isIncluded) {
-        card.classList.add('excluded');
-    }
-    
-    // For disabled entities, show + button instead of checkbox
-    if (!isIncluded) {
-        const addBtn = document.createElement('button');
-        addBtn.className = 'entity-add-btn';
-        addBtn.textContent = '+';
-        addBtn.title = 'Enable thermostat';
-        addBtn.style.cssText = 'padding: 4px 10px; font-size: 18px; font-weight: bold;';
-        addBtn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            addBtn.disabled = true;
-            await toggleEntityInclusion(entity.entity_id, true);
-            addBtn.disabled = false;
-        });
-        
-        const btnWrapper = document.createElement('div');
-        btnWrapper.className = 'entity-checkbox-wrapper';
-        btnWrapper.appendChild(addBtn);
-        card.appendChild(btnWrapper);
-    }
-    
-    const content = document.createElement('div');
-    content.className = 'entity-content';
-    
-    const name = document.createElement('div');
-    name.className = 'entity-name';
-    name.textContent = entity.attributes.friendly_name || entity.entity_id;
-    
-    const temp = document.createElement('div');
-    temp.className = 'entity-temp';
-    const currentTemp = entity.attributes.current_temperature;
-    const targetTemp = entity.attributes.temperature;
-    
-    if (currentTemp !== undefined && currentTemp !== null) {
-        const targetDisplay = (targetTemp !== undefined && targetTemp !== null) 
-            ? `${targetTemp.toFixed(1)}${temperatureUnit}` 
-            : 'N/A';
-        temp.textContent = `${targetDisplay} (${currentTemp.toFixed(1)}${temperatureUnit})`;
-    } else if (targetTemp !== undefined && targetTemp !== null) {
-        temp.textContent = `${targetTemp.toFixed(1)}${temperatureUnit}`;
-    } else {
-        temp.textContent = 'N/A';
-    }
-    
-    content.appendChild(name);
-    content.appendChild(temp);
-    
-    card.appendChild(content);
-    
-    // For active entities, add "Add to group" button
-    if (isIncluded) {
-        const addToGroupBtn = document.createElement('button');
-        addToGroupBtn.className = 'add-to-group-btn';
-        addToGroupBtn.textContent = '+';
-        addToGroupBtn.title = 'Add to group';
-        addToGroupBtn.style.cssText = 'margin-left: 8px; padding: 4px 8px; font-size: 16px;';
-        addToGroupBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            showAddToGroupModal(entity.entity_id);
-        });
-        card.appendChild(addToGroupBtn);
-    }
-    
-    content.addEventListener('click', () => {
-        // Toggle expansion - if already selected, collapse; otherwise expand
-        if (currentEntityId === entity.entity_id) {
-            // Collapse
-            collapseAllEditors();
-            currentEntityId = null;
-            
-            // Reset add to group button text to "+"
-            const addToGroupBtn = card.querySelector('.add-to-group-btn');
-            if (addToGroupBtn) {
-                addToGroupBtn.textContent = '+';
-                addToGroupBtn.style.padding = '4px 8px';
-            }
-        } else {
-            // Expand with editor
-            selectEntity(entity.entity_id);
-            
-            // Change add to group button text to "Add to Group"
-            const addToGroupBtn = card.querySelector('.add-to-group-btn');
-            if (addToGroupBtn) {
-                addToGroupBtn.textContent = 'Add to Group';
-                addToGroupBtn.style.padding = '6px 12px';
-            }
-        }
-    });
-    
-    return card;
+    // All entities should be in groups now (either multi-entity or single-entity groups)
+    // This function is kept for backward compatibility but does nothing
+    return;
 }
 
 // Create the schedule editor element
@@ -1647,96 +1496,6 @@ function collapseAllEditors() {
     allGroupContainers.forEach(container => container.classList.remove('expanded'));
 }
 
-// Select an entity to edit
-async function selectEntity(entityId) {
-    // Collapse all other editors first
-    collapseAllEditors();
-    
-    currentEntityId = entityId;
-    currentGroup = null; // Clear group selection when selecting entity
-    
-    // Find the entity card
-    const entityCard = getDocumentRoot().querySelector(`.entity-card[data-entity-id="${entityId}"]`);
-    if (!entityCard) return;
-    
-    // Mark as selected and expanded
-    entityCard.classList.add('selected', 'expanded');
-    
-    // Add close button to the first row (same level as checkbox)
-    const closeBtn = document.createElement('button');
-    closeBtn.className = 'close-entity-btn';
-    closeBtn.innerHTML = '✕';
-    closeBtn.title = 'Close editor';
-    closeBtn.onclick = (e) => {
-        e.stopPropagation();
-        collapseAllEditors();
-    };
-    
-    // Insert close button before the editor (it will be in the flex row with checkbox and content)
-    const entityContent = entityCard.querySelector('.entity-content');
-    if (entityContent) {
-        entityContent.parentNode.insertBefore(closeBtn, entityContent.nextSibling);
-    }
-    
-    // Create and insert editor inside the card (append to the end)
-    const editor = createScheduleEditor();
-    entityCard.appendChild(editor);
-    
-    // Show entity status section (for single entities)
-    const entityStatus = editor.querySelector('.entity-status');
-    if (entityStatus) {
-        entityStatus.style.display = 'flex';
-    }
-    
-    // Get the entity
-    const entity = climateEntities.find(e => e.entity_id === entityId);
-    
-    // Recreate graph with the new SVG element
-    const svgElement = editor.querySelector('#temperature-graph');
-    if (svgElement) {
-        graph = new TemperatureGraph(svgElement, temperatureUnit);
-        graph.setTooltipMode(tooltipMode);
-        // Apply configured min/max if available
-        if (minTempSetting !== null && maxTempSetting !== null && typeof graph.setMinMax === 'function') {
-            graph.setMinMax(minTempSetting, maxTempSetting);
-        }
-        
-        // Always attach the permanent nodesChanged listener for auto-save
-        svgElement.removeEventListener('nodesChanged', handleGraphChange); // Remove any previous
-        svgElement.addEventListener('nodesChanged', handleGraphChange);
-        svgElement.addEventListener('nodeSettings', handleNodeSettings);
-        
-        // Create and insert settings panel after the graph container but before instructions
-        const graphContainer = svgElement.closest('.graph-container') || svgElement.parentElement;
-        const instructionsContainer = editor.querySelector('.instructions-container');
-        
-        if (graphContainer && instructionsContainer) {
-            const settingsPanel = createSettingsPanel(null, editor);
-            if (settingsPanel) {
-                instructionsContainer.before(settingsPanel);
-            }
-        }
-    }
-    
-    // Load schedule
-    await loadEntitySchedule(entityId);
-    
-    // Load history data
-    await loadHistoryData(entityId);
-    
-    // Load advance history
-    await loadAdvanceHistory(entityId);
-    
-    // Update entity status
-    updateEntityStatus(entity);
-    
-    // Reattach event listeners for the new editor elements
-    attachEditorEventListeners(editor);
-    
-    // Update paste button state
-    updatePasteButtonState();
-}
-
 // Attach event listeners to editor elements (for dynamically created editors)
 function attachEditorEventListeners(editorElement) {
     
@@ -1760,13 +1519,11 @@ function attachEditorEventListeners(editorElement) {
     
     // Ignore button (Unmonitor button for single-entity groups)
     const ignoreBtn = editorElement.querySelector('#ignore-entity-btn');
-    console.log('attachEditorEventListeners - Looking for unmonitor button, found:', !!ignoreBtn);
     if (ignoreBtn) {
-        console.log('Attaching unmonitor button handler');
         ignoreBtn.onclick = async (event) => {
             // For single-entity groups, get entity from the group
-            let entityIdToUnmonitor = currentEntityId;
-            if (!entityIdToUnmonitor && currentGroup) {
+            let entityIdToUnmonitor = null;
+            if (currentGroup) {
                 const groupData = allGroups[currentGroup];
                 if (groupData && groupData.entities && groupData.entities.length === 1) {
                     entityIdToUnmonitor = groupData.entities[0];
@@ -1778,26 +1535,19 @@ function attachEditorEventListeners(editorElement) {
                 return;
             }
             
-            console.log('Unmonitoring entity:', entityIdToUnmonitor);
-            
             if (confirm(`Stop monitoring ${entityIdToUnmonitor}?\n\nUnmonitored entities will not be managed by the scheduler.`)) {
                 try {
-                    console.log('Calling setIgnored service for:', entityIdToUnmonitor);
                     await haAPI.setIgnored(entityIdToUnmonitor, true);
-                    console.log('setIgnored service completed successfully');
                     showToast(`${entityIdToUnmonitor} is now unmonitored`, 'success');
                     // Reload groups to update the display
                     await loadGroups();
                     // Close the editor
                     collapseAllEditors();
-                    currentEntityId = null;
                     currentGroup = null;
                 } catch (error) {
                     console.error('Failed to unmonitor entity:', error);
                     showToast('Failed to unmonitor entity: ' + error.message, 'error');
                 }
-            } else {
-                console.log('User cancelled unmonitor action');
             }
         };
     }
@@ -1823,18 +1573,7 @@ function attachEditorEventListeners(editorElement) {
     if (advanceBtn) {
         // Function to update button state
         const updateAdvanceButton = async () => {
-            if (currentEntityId) {
-                const status = await haAPI.getAdvanceStatus(currentEntityId);
-                if (status && status.is_active) {
-                    advanceBtn.textContent = 'Cancel Advance';
-                    advanceBtn.title = 'Cancel advance override and return to scheduled settings';
-                    advanceBtn.dataset.isOverride = 'true';
-                } else {
-                    advanceBtn.textContent = 'Advance';
-                    advanceBtn.title = 'Advance to next scheduled node';
-                    advanceBtn.dataset.isOverride = 'false';
-                }
-            } else if (currentGroup) {
+            if (currentGroup) {
                 // For groups, check if any entity has an active advance
                 const groupData = allGroups[currentGroup];
                 if (groupData && groupData.entities) {
@@ -1869,29 +1608,19 @@ function attachEditorEventListeners(editorElement) {
                 
                 if (isOverride) {
                     // Cancel advance
-                    if (currentEntityId) {
-                        console.log('Cancelling advance for entity:', currentEntityId);
-                        await haAPI.cancelAdvance(currentEntityId);
-                        showToast('Advance canceled, returned to schedule', 'success');
-                    } else if (currentGroup) {
+                    if (currentGroup) {
                         // Cancel advance for all entities in group
                         const groupData = allGroups[currentGroup];
                         if (groupData && groupData.entities) {
-                            console.log('Cancelling advance for group entities:', groupData.entities);
                             for (const entityId of groupData.entities) {
-                                console.log('  Cancelling:', entityId);
-                                const result = await haAPI.cancelAdvance(entityId);
-                                console.log('  Result:', result);
+                                await haAPI.cancelAdvance(entityId);
                             }
                             showToast('Advance canceled for all entities in group', 'success');
                         }
                     }
                 } else {
                     // Advance to next
-                    if (currentEntityId) {
-                        await haAPI.advanceSchedule(currentEntityId);
-                        showToast('Advanced to next scheduled node', 'success');
-                    } else if (currentGroup) {
+                    if (currentGroup) {
                         await haAPI.advanceGroup(currentGroup);
                         showToast(`Advanced all entities in group to next scheduled node`, 'success');
                     }
@@ -1904,14 +1633,10 @@ function attachEditorEventListeners(editorElement) {
                 await new Promise(resolve => setTimeout(resolve, 500));
                 
                 // Reload advance history to update graph
-                if (currentEntityId) {
-                    console.log('Reloading history for entity:', currentEntityId);
-                    await loadAdvanceHistory(currentEntityId);
-                } else if (currentGroup) {
+                if (currentGroup) {
                     // For groups, reload history for first entity (since they share same schedule)
                     const groupData = allGroups[currentGroup];
                     if (groupData && groupData.entities && groupData.entities.length > 0) {
-                        console.log('Reloading history for first group entity:', groupData.entities[0]);
                         await loadAdvanceHistory(groupData.entities[0]);
                     }
                 }
@@ -1930,11 +1655,7 @@ function attachEditorEventListeners(editorElement) {
         clearHistoryBtn.onclick = async () => {
             clearHistoryBtn.disabled = true;
             try {
-                if (currentEntityId) {
-                    await haAPI.clearAdvanceHistory(currentEntityId);
-                    await loadAdvanceHistory(currentEntityId);
-                    showToast('Advance history cleared', 'success');
-                } else if (currentGroup) {
+                if (currentGroup) {
                     // Clear history for all entities in group
                     const groupData = allGroups[currentGroup];
                     if (groupData && groupData.entities) {
@@ -1961,14 +1682,7 @@ function attachEditorEventListeners(editorElement) {
     const clearBtn = editorElement.querySelector('#clear-schedule-btn');
     if (clearBtn) {
         clearBtn.onclick = async () => {
-            if (currentEntityId) {
-                const entity = climateEntities.find(e => e.entity_id === currentEntityId);
-                const entityName = entity ? entity.attributes.friendly_name : currentEntityId;
-                
-                if (confirm(`Clear schedule for ${entityName}?`)) {
-                    await clearScheduleForEntity(currentEntityId);
-                }
-            } else if (currentGroup) {
+            if (currentGroup) {
                 if (confirm(`Clear schedule for group "${currentGroup}"?`)) {
                     await clearScheduleForGroup(currentGroup);
                 }
@@ -2438,86 +2152,6 @@ async function clearScheduleForGroup(groupName) {
     }
 }
 
-// Load schedule for entity
-async function loadEntitySchedule(entityId, day = null) {
-    try {
-        console.log('loadEntitySchedule called - entityId:', entityId, 'day parameter:', day, 'currentDay:', currentDay);
-        const result = await haAPI.getSchedule(entityId);
-        const schedule = result?.response || result;
-        
-        //
-        
-        if (schedule) {
-            // Update schedule mode from backend (but don't override if already set correctly)
-            if (!currentScheduleMode || currentScheduleMode !== schedule.schedule_mode) {
-                currentScheduleMode = schedule.schedule_mode || 'all_days';
-        //
-            }
-            
-            // Determine which day's schedule to load
-            let dayToLoad = day;
-            if (!dayToLoad) {
-                // If no day specified and currentDay is already set, use it
-                if (currentDay && currentDay !== 'all_days') {
-                    dayToLoad = currentDay;
-        //
-                } else {
-                    // Default to current day based on mode
-                    const now = new Date();
-                    const weekday = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][now.getDay()];
-                    
-                    if (currentScheduleMode === 'all_days') {
-                        dayToLoad = 'all_days';
-                    } else if (currentScheduleMode === '5/2') {
-                        dayToLoad = (weekday === 'sat' || weekday === 'sun') ? 'weekend' : 'weekday';
-                    } else {
-                        dayToLoad = weekday;
-                    }
-        //
-                }
-            }
-            
-            currentDay = dayToLoad;
-        //
-            
-            // Get nodes for the selected day
-            let nodes = [];
-            if (schedule.schedules && schedule.schedules[dayToLoad]) {
-                nodes = schedule.schedules[dayToLoad];
-        //
-            } else if (schedule.nodes) {
-                // Backward compatibility - old format
-                nodes = schedule.nodes;
-        //
-            } else if (schedule.schedules && schedule.schedules['all_days']) {
-                // If this day doesn't exist, use all_days as template
-                nodes = schedule.schedules['all_days'];
-        //
-            } else {
-        //
-            }
-            
-            // Update UI
-            updateScheduleModeUI();
-        //
-            graph.setNodes(nodes);
-            getDocumentRoot().querySelector('#schedule-enabled').checked = schedule.enabled !== false;
-        } else {
-            // New schedule - set defaults
-            currentScheduleMode = 'all_days';
-            currentDay = 'all_days';
-            updateScheduleModeUI();
-            graph.setNodes([]);
-            getDocumentRoot().querySelector('#schedule-enabled').checked = true;
-        }
-        
-        updateScheduledTemp();
-        updatePasteButtonState();
-    } catch (error) {
-        console.error('Failed to load schedule:', error);
-    }
-}
-
 // Update schedule mode UI to reflect current mode and day
 function updateScheduleModeUI() {
     // Update mode radio buttons
@@ -2636,14 +2270,10 @@ function updateGraphProfileDropdown() {
     if (!graphProfileDropdown) return;
     
     // Get current active profile
-    const activeProfile = currentEntityId 
-        ? (allEntities[currentEntityId]?.active_profile || 'Default')
-        : (currentGroup && allGroups[currentGroup]?.active_profile) || 'Default';
+    const activeProfile = (currentGroup && allGroups[currentGroup]?.active_profile) || 'Default';
     
     // Get all profiles
-    const profiles = currentEntityId
-        ? (allEntities[currentEntityId]?.profiles ? Object.keys(allEntities[currentEntityId].profiles) : ['Default'])
-        : (currentGroup && allGroups[currentGroup]?.profiles ? Object.keys(allGroups[currentGroup].profiles) : ['Default']);
+    const profiles = (currentGroup && allGroups[currentGroup]?.profiles ? Object.keys(allGroups[currentGroup].profiles) : ['Default']);
     
     // Update dropdown options
     graphProfileDropdown.innerHTML = '';
@@ -2671,11 +2301,6 @@ function updateGraphProfileDropdown() {
                 allGroups = await haAPI.getGroups();
                 if (allGroups.groups) allGroups = allGroups.groups;
                 await editGroupSchedule(currentGroup);
-            } else if (currentEntityId) {
-                await haAPI.setActiveProfile(currentEntityId, newProfile, false);
-                // Reload entity data
-                allEntities = await haAPI.getEntities();
-                await loadEntitySchedule(currentEntityId);
             }
             
             // Update both dropdowns
@@ -2725,7 +2350,7 @@ function updateGraphTitle() {
 
 // Switch to a different schedule mode
 async function switchScheduleMode(newMode) {
-    if (!currentEntityId && !currentGroup) return;
+    if (!currentGroup) return;
     
     currentScheduleMode = newMode;
     
@@ -2750,9 +2375,6 @@ async function switchScheduleMode(newMode) {
         if (allGroups[currentGroup]) {
             allGroups[currentGroup].schedule_mode = currentScheduleMode;
         }
-    } else if (currentEntityId) {
-        const nodes = graph.getNodes();
-        await haAPI.setSchedule(currentEntityId, nodes, currentDay, currentScheduleMode);
     }
     
     // Update UI
@@ -2802,14 +2424,12 @@ async function switchScheduleMode(newMode) {
         
         // Update scheduled temp display
         updateScheduledTemp();
-    } else {
-        await loadEntitySchedule(currentEntityId);
     }
 }
 
 // Switch to a different day
 async function switchDay(day) {
-    if (!currentEntityId && !currentGroup) return;
+    if (!currentGroup) return;
     
     // Switching day - no need to save since auto-save already persisted changes
     currentDay = day;
@@ -2865,8 +2485,6 @@ async function switchDay(day) {
         
         // Update scheduled temp display
         updateScheduledTemp();
-    } else {
-        await loadEntitySchedule(currentEntityId, day);
     }
 }
 
@@ -3020,19 +2638,14 @@ async function loadGroupHistoryData(entityIds) {
 async function saveSchedule() {
     // Don't save if we're in the middle of loading a schedule
     if (isLoadingSchedule) {
-        console.log('saveSchedule - skipping save, currently loading schedule');
         return;
     }
-    
-    console.log('saveSchedule - currentDay:', currentDay, 'currentScheduleMode:', currentScheduleMode);
     
     // Check if we're editing a group schedule
     if (currentGroup) {
         try {
             const nodes = graph.getNodes();
             const enabled = getDocumentRoot().querySelector('#schedule-enabled').checked;
-            
-            console.log('Saving group schedule - group:', currentGroup, 'nodes:', nodes.length, 'day:', currentDay, 'mode:', currentScheduleMode);
             
             // Save to group schedule with day and mode
             await haAPI.setGroupSchedule(currentGroup, nodes, currentDay, currentScheduleMode);
@@ -3966,29 +3579,20 @@ function setupEventListeners() {
                 // Get current settings
                 const settings = await haAPI.getSettings();
                 
-                console.log(`Converting from ${fromUnit} to ${targetUnit}`);
-                console.log('Settings before conversion:', JSON.stringify(settings, null, 2));
-                
                 // Convert all schedules using user-selected units
                 await convertAllSchedules(fromUnit, targetUnit);
                 
                 // Convert min/max settings
                 if (settings.min_temp !== undefined) {
-                    const oldMin = settings.min_temp;
                     settings.min_temp = convertTemperature(settings.min_temp, fromUnit, targetUnit);
-                    console.log(`Converted min_temp: ${oldMin}${fromUnit} → ${settings.min_temp}${targetUnit}`);
                 }
                 if (settings.max_temp !== undefined) {
-                    const oldMax = settings.max_temp;
                     settings.max_temp = convertTemperature(settings.max_temp, fromUnit, targetUnit);
-                    console.log(`Converted max_temp: ${oldMax}${fromUnit} → ${settings.max_temp}${targetUnit}`);
                 }
                 
                 // Convert default schedule
                 if (settings.defaultSchedule) {
-                    console.log('Default schedule before conversion:', settings.defaultSchedule);
                     settings.defaultSchedule = convertScheduleNodes(settings.defaultSchedule, fromUnit, targetUnit);
-                    console.log('Default schedule after conversion:', settings.defaultSchedule);
                 }
                 
                 // Update temperature unit
@@ -4303,8 +3907,6 @@ async function convertAllSchedules(fromUnit, toUnit) {
                 }
             }
         }
-        
-        console.log('All schedules converted successfully');
     } catch (error) {
         console.error('Failed to convert schedules:', error);
     }
@@ -4322,7 +3924,6 @@ async function loadSettings() {
         storedTemperatureUnit = savedUnit || temperatureUnit;
         
         if (savedUnit && savedUnit !== temperatureUnit) {
-            console.log(`Temperature unit changed from ${savedUnit} to ${temperatureUnit}, converting schedules...`);
             await convertAllSchedules(savedUnit, temperatureUnit);
             // Update stored unit
             settings.temperature_unit = temperatureUnit;
@@ -4334,7 +3935,6 @@ async function loadSettings() {
                 // Check if default schedule looks like it's in Celsius (temps < 40)
                 const maxTemp = Math.max(...settings.defaultSchedule.map(n => n.temp));
                 if (maxTemp < 40) {
-                    console.log('First time load on Fahrenheit system - converting default schedule from Celsius');
                     settings.defaultSchedule = convertScheduleNodes(settings.defaultSchedule, '°C', '°F');
                     // Also convert min/max if they look like Celsius
                     if (settings.min_temp && settings.min_temp < 40) {

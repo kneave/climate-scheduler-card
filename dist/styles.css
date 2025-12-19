@@ -196,10 +196,6 @@ climate-scheduler-panel {
     overflow-y: visible;
 }
 
-.active-section {
-    margin-bottom: 20px;
-}
-
 .selector-header {
     display: flex;
     justify-content: space-between;
