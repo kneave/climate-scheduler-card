@@ -12,6 +12,7 @@ class TemperatureGraph {
         this.draggingNode = null;
         this.draggingSegment = null; // {startIndex, endIndex, initialStartTime, initialEndTime, initialPointerMinutes}
         this.dragOffset = { x: 0, y: 0 };
+        this.initialNodeState = null; // Store initial node state to detect actual changes
         this.lastTapTime = 0;
         this.lastTapNode = null;
         this.lastClickTime = 0;
@@ -1049,12 +1050,18 @@ class TemperatureGraph {
             this.lastTapTime = Date.now();
             this.startDragPoint = point;
             
+            // Save initial node state to detect changes
+            const node = this.nodes[clickedNode];
+            this.initialNodeState = {
+                time: node.time,
+                temp: node.temp
+            };
+            
             // Save state before potential drag
             this.saveState();
             
             // Start potential drag
             this.draggingNode = clickedNode;
-            const node = this.nodes[clickedNode];
             this.dragOffset.x = point.x - this.timeToX(node.time);
             this.dragOffset.y = point.y - this.tempToY(node.temp);
             
@@ -1243,23 +1250,28 @@ class TemperatureGraph {
             const dragDistance = this.startDragPoint ? 
                 Math.sqrt(Math.pow(point.x - this.startDragPoint.x, 2) + Math.pow(point.y - this.startDragPoint.y, 2)) : 999;
 
-            // If didn't drag much (less than 10 pixels), treat as a click to show settings
-            if (dragDistance < 10) {
-                // No actual drag happened - remove the saved state
+            // Check if node values actually changed
+            const node = this.nodes[this.draggingNode];
+            const nodeChanged = this.initialNodeState && 
+                (node.time !== this.initialNodeState.time || node.temp !== this.initialNodeState.temp);
+
+            // Only save if values actually changed
+            if (nodeChanged) {
+                this.notifyChange();
+            } else {
+                // No actual change - remove the saved state to keep undo stack clean
                 if (this.undoStack.length > 0) {
                     this.undoStack.pop();
                     this.updateUndoButtonState();
                 }
-                this.showNodeSettings(this.draggingNode);
-            } else {
-                // Actual drag - notify change
-                this.notifyChange();
-                // Show node settings for the dragged node
-                this.showNodeSettings(this.draggingNode);
             }
+
+            // Always show node settings (whether clicked or dragged)
+            this.showNodeSettings(this.draggingNode);
 
             this.draggingNode = null;
             this.draggingSegment = null;
+            this.initialNodeState = null;
             this.hideTooltip();
             this.startDragPoint = null;
             // Render to show the label again
