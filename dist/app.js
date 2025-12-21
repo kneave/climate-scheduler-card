@@ -41,6 +41,7 @@ function convertScheduleNodes(nodes, fromUnit, toUnit) {
 let allGroups = {}; // Store all groups data
 let allEntities = {}; // Store all entities data with their schedules
 let currentGroup = null; // Currently selected group
+let editingProfile = null; // Profile being edited (null means editing active profile)
 let tooltipMode = 'history'; // 'history' or 'cursor'
 let debugPanelEnabled = localStorage.getItem('debugPanelEnabled') === 'true'; // Debug panel visibility
 let currentDay = null; // Currently selected day for editing (e.g., 'mon', 'weekday')
@@ -765,6 +766,7 @@ function createSettingsPanel(groupData, editor) {
                 <select id="profile-dropdown" class="profile-dropdown">
                     <option value="Default">Default</option>
                 </select>
+                <button id="edit-profile-btn" class="btn-profile btn-edit-profile" title="Edit selected profile">Edit</button>
                 <button id="new-profile-btn" class="btn-profile" title="Create new profile">＋</button>
                 <button id="rename-profile-btn" class="btn-profile" title="Rename profile">✎</button>
                 <button id="delete-profile-btn" class="btn-profile" title="Delete profile">✕</button>
@@ -857,6 +859,69 @@ function createSettingsPanel(groupData, editor) {
     return container;
 }
 
+// Show/hide editing profile indicator
+function showEditingProfileIndicator(editingProfile, activeProfile) {
+    let indicator = getDocumentRoot().querySelector('#editing-profile-indicator');
+    
+    if (editingProfile && editingProfile !== activeProfile) {
+        if (!indicator) {
+            // Create indicator if it doesn't exist
+            const graphContainer = getDocumentRoot().querySelector('.graph-container');
+            if (graphContainer) {
+                indicator = document.createElement('div');
+                indicator.id = 'editing-profile-indicator';
+                indicator.style.cssText = 'font-weight: bold; padding: 8px; margin-bottom: 8px; text-align: center; color: var(--accent-color); border: 1px solid var(--divider-color); border-radius: 4px; display: flex; align-items: center; justify-content: center; gap: 12px;';
+                graphContainer.insertBefore(indicator, graphContainer.firstChild);
+            }
+        }
+        if (indicator) {
+            indicator.innerHTML = `
+                <span>Editing Profile: ${editingProfile}</span>
+                <button id="close-editing-profile" style="padding: 4px 12px; cursor: pointer; background: var(--primary-color); color: var(--text-primary-color); border: none; border-radius: 4px; font-weight: normal;">Done</button>
+            `;
+            indicator.style.display = 'flex';
+            
+            // Add click handler to Close button
+            const closeBtn = indicator.querySelector('#close-editing-profile');
+            if (closeBtn) {
+                closeBtn.onclick = async () => {
+                    // Clear editing state
+                    editingProfile = null;
+                    
+                    // Load the active profile back into the graph
+                    if (currentGroup && allGroups[currentGroup]) {
+                        const groupData = allGroups[currentGroup];
+                        const activeProfile = groupData.active_profile || 'Default';
+                        const profileData = groupData.profiles && groupData.profiles[activeProfile];
+                        
+                        if (profileData) {
+                            currentScheduleMode = profileData.schedule_mode || 'all_days';
+                            const schedules = profileData.schedules || {};
+                            const day = currentDay || 'all_days';
+                            const nodes = schedules[day] || schedules['all_days'] || [];
+                            
+                            if (graph) {
+                                graph.setNodes(nodes);
+                            }
+                            
+                            // Update UI
+                            updateScheduleModeUI();
+                        }
+                    }
+                    
+                    // Hide the indicator
+                    showEditingProfileIndicator(null, activeProfile);
+                    showToast('Returned to active profile', 'info');
+                };
+            }
+        }
+    } else {
+        if (indicator) {
+            indicator.style.display = 'none';
+        }
+    }
+}
+
 // Setup profile management event handlers
 async function setupProfileHandlers(container, groupData) {
     if (!groupData || !currentGroup) {
@@ -867,22 +932,30 @@ async function setupProfileHandlers(container, groupData) {
     // Load and populate profiles
     await loadProfiles(container, currentGroup, true);
     
-    // Profile dropdown change handler
+    // Profile dropdown change handler (no automatic loading)
     const profileDropdown = container.querySelector('#profile-dropdown');
-    if (profileDropdown) {
-        profileDropdown.onchange = async () => {
+    
+    // Edit profile button handler
+    const editProfileBtn = container.querySelector('#edit-profile-btn');
+    if (editProfileBtn && profileDropdown) {
+        editProfileBtn.onclick = async () => {
             const selectedProfile = profileDropdown.value;
+            const activeProfile = groupData.active_profile;
+            
             try {
-                // Just load the selected profile's data for viewing/editing
-                // Don't set it as active - user can use the top dropdown for that
+                // Load group data to get the latest profile schedules
                 const groupsResult = await haAPI.getGroups();
                 allGroups = groupsResult.groups || {};
                 
                 // Load the selected profile's schedule data into the graph
-                const groupData = allGroups[currentGroup];
-                if (groupData && groupData.profiles && groupData.profiles[selectedProfile]) {
-                    const profileData = groupData.profiles[selectedProfile];
-                    // Temporarily update the schedules to show the selected profile
+                const updatedGroupData = allGroups[currentGroup];
+                if (updatedGroupData && updatedGroupData.profiles && updatedGroupData.profiles[selectedProfile]) {
+                    const profileData = updatedGroupData.profiles[selectedProfile];
+                    
+                    // Track which profile we're editing
+                    editingProfile = selectedProfile;
+                    
+                    // Update the schedules to show the selected profile
                     currentScheduleMode = profileData.schedule_mode || 'all_days';
                     const schedules = profileData.schedules || {};
                     const day = currentDay || 'all_days';
@@ -891,9 +964,16 @@ async function setupProfileHandlers(container, groupData) {
                     if (graph) {
                         graph.setNodes(nodes);
                     }
+                    
+                    // Show editing indicator if editing a different profile than active
+                    if (selectedProfile !== activeProfile) {
+                        showEditingProfileIndicator(selectedProfile, activeProfile);
+                    } else {
+                        showEditingProfileIndicator(null, activeProfile);
+                    }
                 }
                 
-                showToast(`Viewing profile: ${selectedProfile}`, 'info');
+                showToast(`Now editing profile: ${selectedProfile}`, 'info');
             } catch (error) {
                 console.error('Failed to load profile:', error);
                 showToast('Failed to load profile: ' + error.message, 'error');
@@ -2516,6 +2596,10 @@ async function switchScheduleMode(newMode) {
         //
         }, 100);
         
+        // Clear editing profile and hide indicator when returning to active profile
+        editingProfile = null;
+        showEditingProfileIndicator(null, groupData.active_profile);
+        
         // Update scheduled temp display
         updateScheduledTemp();
     }
@@ -2576,6 +2660,10 @@ async function switchDay(day) {
             isLoadingSchedule = false;
         //
         }, 100);
+        
+        // Clear editing profile and hide indicator when returning to active profile
+        editingProfile = null;
+        showEditingProfileIndicator(null, groupData.active_profile);
         
         // Update scheduled temp display
         updateScheduledTemp();
@@ -2741,8 +2829,23 @@ async function saveSchedule() {
             const nodes = graph.getNodes();
             const enabled = getDocumentRoot().querySelector('#schedule-enabled').checked;
             
+            // Check if we're editing a non-active profile
+            const groupData = allGroups[currentGroup];
+            const activeProfile = groupData ? groupData.active_profile : null;
+            const needsProfileSwitch = editingProfile && editingProfile !== activeProfile;
+            
+            // Temporarily switch to editing profile if needed
+            if (needsProfileSwitch) {
+                await haAPI.setActiveProfile(currentGroup, editingProfile, true);
+            }
+            
             // Save to group schedule with day and mode
             await haAPI.setGroupSchedule(currentGroup, nodes, currentDay, currentScheduleMode);
+            
+            // Switch back to original active profile if we changed it
+            if (needsProfileSwitch && activeProfile) {
+                await haAPI.setActiveProfile(currentGroup, activeProfile, true);
+            }
             
             // Update enabled state
             if (enabled) {
