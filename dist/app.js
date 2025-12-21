@@ -346,6 +346,13 @@ function renderIgnoredEntities() {
         return !isInMonitoredGroup;
     });
     
+    // Sort alphabetically by friendly name
+    unmonitoredEntities.sort((a, b) => {
+        const nameA = (a.attributes?.friendly_name || a.entity_id).toLowerCase();
+        const nameB = (b.attributes?.friendly_name || b.entity_id).toLowerCase();
+        return nameA.localeCompare(nameB);
+    });
+    
     // Update count
     if (ignoredCount) {
         ignoredCount.textContent = unmonitoredEntities.length;
@@ -372,6 +379,9 @@ function renderIgnoredEntities() {
         nameSpan.textContent = friendlyName;
         nameSpan.style.flex = '1';
         
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.cssText = 'display: flex; gap: 8px;';
+        
         const unignoreBtn = document.createElement('button');
         unignoreBtn.textContent = 'Monitor';
         unignoreBtn.className = 'btn-secondary-outline';
@@ -381,7 +391,15 @@ function renderIgnoredEntities() {
             if (confirm(`Start monitoring ${friendlyName}?\n\nThis entity will be managed by the scheduler again.`)) {
                 try {
                     await haAPI.setIgnored(entityId, false);
-                    showToast(`${friendlyName} is now monitored`, 'success');
+                    
+                    // Verify the entity was created successfully
+                    const schedule = await haAPI.getSchedule(entityId);
+                    if (schedule && schedule.ignored === false) {
+                        showToast(`${friendlyName} is now monitored. Refresh the page to edit its schedule.`, 'success');
+                    } else {
+                        showToast(`${friendlyName} status updated, but verification failed. Try refreshing the page.`, 'warning');
+                    }
+                    
                     // Reload groups to update the display
                     await loadGroups();
                 } catch (error) {
@@ -391,8 +409,50 @@ function renderIgnoredEntities() {
             }
         };
         
+        const addToGroupBtn = document.createElement('button');
+        addToGroupBtn.textContent = 'Add to Group';
+        addToGroupBtn.className = 'btn-primary-outline';
+        addToGroupBtn.style.cssText = 'padding: 4px 12px; font-size: 0.85rem;';
+        addToGroupBtn.onclick = async (e) => {
+            e.stopPropagation();
+            
+            // First, monitor the entity
+            try {
+                await haAPI.setIgnored(entityId, false);
+                
+                // Verify the entity was created successfully
+                const schedule = await haAPI.getSchedule(entityId);
+                if (!schedule || schedule.ignored !== false) {
+                    showToast(`Failed to monitor ${friendlyName}. Try refreshing the page.`, 'error');
+                    return;
+                }
+                
+                // Now show the add to group modal
+                const modal = getDocumentRoot().querySelector('#add-to-group-modal');
+                const entityNameEl = getDocumentRoot().querySelector('#add-entity-name');
+                
+                if (modal && entityNameEl) {
+                    // Store entity info on modal
+                    modal.dataset.entityId = entityId;
+                    modal.dataset.isUnmonitoredAdd = 'true';
+                    entityNameEl.textContent = friendlyName;
+                    
+                    // Show the modal (will populate groups in existing handler)
+                    showAddToGroupModal(entityId);
+                } else {
+                    showToast(`${friendlyName} is now monitored. Refresh the page to add to a group.`, 'warning');
+                }
+            } catch (error) {
+                console.error('Failed to monitor entity:', error);
+                showToast('Failed to monitor entity: ' + error.message, 'error');
+            }
+        };
+        
+        buttonContainer.appendChild(unignoreBtn);
+        buttonContainer.appendChild(addToGroupBtn);
+        
         item.appendChild(nameSpan);
-        item.appendChild(unignoreBtn);
+        item.appendChild(buttonContainer);
         ignoredContainer.appendChild(item);
     });
 }
@@ -3396,6 +3456,7 @@ function setupEventListeners() {
             const entityId = modal ? modal.dataset.entityId : null;
             const currentGroupName = modal ? modal.dataset.currentGroup : null;
             const isMove = modal ? modal.dataset.isMove === 'true' : false;
+            const isUnmonitoredAdd = modal ? modal.dataset.isUnmonitoredAdd === 'true' : false;
             const selectElement = getDocumentRoot().querySelector('#add-to-group-select');
             const newGroupInput = getDocumentRoot().querySelector('#new-group-name-inline');
             
@@ -3439,6 +3500,7 @@ function setupEventListeners() {
                     modal.style.display = 'none';
                     delete modal.dataset.currentGroup;
                     delete modal.dataset.isMove;
+                    delete modal.dataset.isUnmonitoredAdd;
                 }
                 
                 // Reload groups
@@ -3450,6 +3512,8 @@ function setupEventListeners() {
                 // Show appropriate message
                 if (isMove && currentGroupName) {
                     showToast(`Moved entity from ${currentGroupName} to ${groupName}`, 'success');
+                } else if (isUnmonitoredAdd) {
+                    showToast(`Added entity to ${groupName}. Refresh the page to edit its schedule.`, 'success');
                 } else {
                     showToast(`Added entity to ${groupName}`, 'success');
                 }
