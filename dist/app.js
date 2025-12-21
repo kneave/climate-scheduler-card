@@ -509,35 +509,33 @@ function createGroupContainer(groupName, groupData) {
     
     header.appendChild(leftSide);
     
-    // Add rename button for multi-entity groups (not single-entity groups)
-    if (!isSingleEntity) {
-        const actions = document.createElement('div');
-        actions.className = 'group-actions';
-        actions.style.cssText = 'display: flex; gap: 4px; align-items: center;';
-        
-        const renameBtn = document.createElement('button');
-        renameBtn.textContent = '✎';
-        renameBtn.className = 'btn-icon';
-        renameBtn.title = 'Rename group';
-        renameBtn.style.cssText = 'padding: 4px 8px; font-size: 1rem; background: none; border: none; cursor: pointer; color: var(--text-secondary);';
-        renameBtn.onclick = async (e) => {
-            e.stopPropagation();
-            const newName = prompt(`Rename group "${groupName}" to:`, groupName);
-            if (newName && newName.trim() !== '' && newName !== groupName) {
-                try {
-                    await haAPI.renameGroup(groupName, newName.trim());
-                    showToast(`Renamed group to: ${newName}`, 'success');
-                    await loadGroups();
-                } catch (error) {
-                    console.error('Failed to rename group:', error);
-                    showToast('Failed to rename group: ' + error.message, 'error');
-                }
+    // Add rename button for all groups
+    const actions = document.createElement('div');
+    actions.className = 'group-actions';
+    actions.style.cssText = 'display: flex; gap: 4px; align-items: center;';
+    
+    const renameBtn = document.createElement('button');
+    renameBtn.textContent = '✎';
+    renameBtn.className = 'btn-icon';
+    renameBtn.title = 'Rename group';
+    renameBtn.style.cssText = 'padding: 4px 8px; font-size: 1rem; background: none; border: none; cursor: pointer; color: var(--text-secondary);';
+    renameBtn.onclick = async (e) => {
+        e.stopPropagation();
+        const newName = prompt(`Rename group "${groupName}" to:`, groupName);
+        if (newName && newName.trim() !== '' && newName !== groupName) {
+            try {
+                await haAPI.renameGroup(groupName, newName.trim());
+                showToast(`Renamed group to: ${newName}`, 'success');
+                await loadGroups();
+            } catch (error) {
+                console.error('Failed to rename group:', error);
+                showToast('Failed to rename group: ' + error.message, 'error');
             }
-        };
-        
-        actions.appendChild(renameBtn);
-        header.appendChild(actions);
-    }
+        }
+    };
+    
+    actions.appendChild(renameBtn);
+    header.appendChild(actions);
     
     // Toggle collapse/expand and edit schedule on header click
     header.onclick = (e) => {
@@ -2431,22 +2429,16 @@ function updateGraphDaySelector() {
 
 // Update the profile dropdown above the graph
 function updateGraphProfileDropdown() {
-    console.log('[updateGraphProfileDropdown] Called');
-    console.log('[updateGraphProfileDropdown] currentGroup:', currentGroup);
     const graphProfileDropdown = getDocumentRoot().querySelector('#graph-profile-dropdown');
     if (!graphProfileDropdown) {
-        console.log('[updateGraphProfileDropdown] Dropdown not found, returning');
         return;
     }
     
     // Get current active profile
     const activeProfile = (currentGroup && allGroups[currentGroup]?.active_profile) || 'Default';
-    console.log('[updateGraphProfileDropdown] activeProfile:', activeProfile);
-    console.log('[updateGraphProfileDropdown] allGroups[currentGroup]:', allGroups[currentGroup]);
     
     // Get all profiles
     const profiles = (currentGroup && allGroups[currentGroup]?.profiles ? Object.keys(allGroups[currentGroup].profiles) : ['Default']);
-    console.log('[updateGraphProfileDropdown] profiles:', profiles);
     
     // Update dropdown options
     graphProfileDropdown.innerHTML = '';
@@ -2456,7 +2448,6 @@ function updateGraphProfileDropdown() {
         option.textContent = profileName;
         if (profileName === activeProfile) {
             option.selected = true;
-            console.log('[updateGraphProfileDropdown] Selected profile:', profileName);
         }
         graphProfileDropdown.appendChild(option);
     });
@@ -2467,38 +2458,26 @@ function updateGraphProfileDropdown() {
     
     // Set the value after cloning to ensure it's selected
     newDropdown.value = activeProfile;
-    console.log('[updateGraphProfileDropdown] Set dropdown value to:', activeProfile);
     
     // Add event listener for profile change
     newDropdown.addEventListener('change', async (e) => {
         const newProfile = e.target.value;
-        console.log('[Profile Dropdown] Profile change triggered, newProfile:', newProfile);
-        console.log('[Profile Dropdown] currentGroup:', currentGroup);
-        console.log('[Profile Dropdown] allGroups before reload:', allGroups[currentGroup]);
         
         try {
             if (currentGroup) {
-                console.log('[Profile Dropdown] Calling setActiveProfile...');
                 await haAPI.setActiveProfile(currentGroup, newProfile, true);
-                console.log('[Profile Dropdown] setActiveProfile completed');
                 
                 // Reload group data from server
-                console.log('[Profile Dropdown] Calling getGroups...');
                 const groupsResult = await haAPI.getGroups();
-                console.log('[Profile Dropdown] getGroups result:', groupsResult);
                 allGroups = groupsResult.groups || groupsResult;
-                console.log('[Profile Dropdown] allGroups after reload:', allGroups[currentGroup]);
-                console.log('[Profile Dropdown] Active profile in data:', allGroups[currentGroup]?.active_profile);
                 
                 // editGroupSchedule will call updateGraphProfileDropdown via updateGraphDaySelector
-                console.log('[Profile Dropdown] Calling editGroupSchedule...');
                 await editGroupSchedule(currentGroup);
-                console.log('[Profile Dropdown] editGroupSchedule completed');
             }
             
             showToast(`Switched to profile: ${newProfile}`, 'success');
         } catch (error) {
-            console.error('[Profile Dropdown] Failed to switch profile:', error);
+            console.error('Failed to switch profile:', error);
             showToast('Failed to switch profile', 'error');
         }
     });
