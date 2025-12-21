@@ -417,35 +417,20 @@ function renderIgnoredEntities() {
         addToGroupBtn.onclick = async (e) => {
             e.stopPropagation();
             
-            // First, monitor the entity
-            try {
-                await haAPI.setIgnored(entityId, false);
+            // Show the add to group modal without monitoring yet
+            const modal = getDocumentRoot().querySelector('#add-to-group-modal');
+            const entityNameEl = getDocumentRoot().querySelector('#add-entity-name');
+            
+            if (modal && entityNameEl) {
+                // Store entity info on modal
+                modal.dataset.entityId = entityId;
+                modal.dataset.isUnmonitoredAdd = 'true';
+                entityNameEl.textContent = friendlyName;
                 
-                // Verify the entity was created successfully
-                const schedule = await haAPI.getSchedule(entityId);
-                if (!schedule || schedule.ignored !== false) {
-                    showToast(`Failed to monitor ${friendlyName}. Try refreshing the page.`, 'error');
-                    return;
-                }
-                
-                // Now show the add to group modal
-                const modal = getDocumentRoot().querySelector('#add-to-group-modal');
-                const entityNameEl = getDocumentRoot().querySelector('#add-entity-name');
-                
-                if (modal && entityNameEl) {
-                    // Store entity info on modal
-                    modal.dataset.entityId = entityId;
-                    modal.dataset.isUnmonitoredAdd = 'true';
-                    entityNameEl.textContent = friendlyName;
-                    
-                    // Show the modal (will populate groups in existing handler)
-                    showAddToGroupModal(entityId);
-                } else {
-                    showToast(`${friendlyName} is now monitored. Refresh the page to add to a group.`, 'warning');
-                }
-            } catch (error) {
-                console.error('Failed to monitor entity:', error);
-                showToast('Failed to monitor entity: ' + error.message, 'error');
+                // Show the modal (will populate groups in existing handler)
+                showAddToGroupModal(entityId);
+            } else {
+                showToast(`Failed to show group selection modal`, 'error');
             }
         };
         
@@ -718,7 +703,7 @@ function createSettingsPanel(groupData, editor) {
     const toggleHeader = document.createElement('div');
     toggleHeader.className = 'schedule-settings-toggle';
     toggleHeader.innerHTML = `
-        <span class="toggle-icon">▶</span>
+        <span class="toggle-icon" style="transform: rotate(-90deg);">▼</span>
         <span class="toggle-text">Schedule Settings</span>
     `;
     toggleHeader.style.cursor = 'pointer';
@@ -3618,6 +3603,24 @@ function setupEventListeners() {
             }
             
             try {
+                // If this is an unmonitored entity being added, monitor it first
+                if (isUnmonitoredAdd) {
+                    await haAPI.setIgnored(entityId, false);
+                    
+                    // Verify the entity was created successfully
+                    const schedule = await haAPI.getSchedule(entityId);
+                    if (!schedule || schedule.ignored !== false) {
+                        if (modal) {
+                            modal.style.display = 'none';
+                            delete modal.dataset.currentGroup;
+                            delete modal.dataset.isMove;
+                            delete modal.dataset.isUnmonitoredAdd;
+                        }
+                        showToast(`Failed to monitor entity. Try refreshing the page.`, 'error');
+                        return;
+                    }
+                }
+                
                 // If moving, remove from current group first
                 if (isMove && currentGroupName) {
                     await haAPI.removeFromGroup(currentGroupName, entityId);
