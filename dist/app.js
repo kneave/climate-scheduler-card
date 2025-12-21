@@ -741,8 +741,7 @@ function createSettingsPanel(groupData, editor) {
     }
     
     controlsHTML += `
-            <button id="clear-schedule-btn" class="btn-danger-outline schedule-btn" title="Clear entire schedule">Clear Schedule</button>
-            <button id="save-schedule-btn" class="btn-primary schedule-btn" title="Save schedule">Save</button>`;
+            <button id="clear-schedule-btn" class="btn-danger-outline schedule-btn" title="Clear entire schedule">Clear Schedule</button>`;
     
     // Add delete group button if this is a group
     if (groupData) {
@@ -1407,6 +1406,7 @@ function createScheduleEditor() {
                     <button id="graph-copy-btn" class="btn-quick-action" title="Copy schedule">Copy</button>
                     <button id="graph-paste-btn" class="btn-quick-action" title="Paste schedule" disabled>Paste</button>
                     <button id="graph-undo-btn" class="btn-quick-action" title="Undo last change">Undo</button>
+                    <button id="save-schedule-btn" class="btn-quick-action btn-primary" title="Save schedule">Save</button>
                 </div>
                 <div class="graph-profile-selector" id="graph-profile-selector">
                     <label>Profile:</label>
