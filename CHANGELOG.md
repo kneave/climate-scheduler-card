@@ -13,8 +13,17 @@
 
 
 
-## [0.6.1] - 2025-12-20
-### Fixed
-- Auto-save was filtering on node distance moved rather than changes to the actual data, auto-save should now work for small time/temperature changes
 
-## [0.6.0] - 2025-12-19
+## [0.7.0] - 2025-12-21
+### Added
+- Added profile editing for non-active profiles
+
+### Changed
+- Moved a few UI elements for improved workflow
+- Better handling of group management
+
+### Fixed
+- Schedule Settings icon rotation is now correct
+- Various fixes to entity/group management
+
+## [0.6.1] - 2025-12-20
