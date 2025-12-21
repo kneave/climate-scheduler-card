@@ -481,13 +481,20 @@ function createGroupContainer(groupName, groupData) {
     const title = document.createElement('span');
     title.className = 'group-title';
     
-    // For single-entity groups, display the entity's friendly name
+    // For single-entity groups, display the entity's friendly name only if the group name equals the entity ID
+    // (indicating an auto-created group). Otherwise, show the group name (user explicitly created it)
     const isSingleEntity = groupData.entities && groupData.entities.length === 1;
     if (isSingleEntity) {
         const entityId = groupData.entities[0];
-        const entity = climateEntities.find(e => e.entity_id === entityId);
-        const friendlyName = entity?.attributes?.friendly_name || entityId;
-        title.textContent = friendlyName;
+        // Only show friendly name if group name matches entity ID (auto-created)
+        if (groupName === entityId) {
+            const entity = climateEntities.find(e => e.entity_id === entityId);
+            const friendlyName = entity?.attributes?.friendly_name || entityId;
+            title.textContent = friendlyName;
+        } else {
+            // User explicitly created this group with a custom name
+            title.textContent = groupName;
+        }
     } else {
         title.textContent = groupName;
     }
@@ -1344,18 +1351,22 @@ function showMoveToGroupModal(currentGroupName, entityId) {
             return;
         }
         
-        // For single-entity groups, use the entity's friendly name
+        // For single-entity groups, use the entity's friendly name only if group name matches entity ID
         const isSingleEntity = groupData.entities && groupData.entities.length === 1;
         let displayName = groupName;
         if (isSingleEntity) {
             const targetEntityId = groupData.entities[0];
-            const entity = climateEntities.find(e => e.entity_id === targetEntityId);
-            if (entity && entity.attributes?.friendly_name) {
-                displayName = entity.attributes.friendly_name;
-            } else {
-                // Fallback to entity_id without the domain prefix
-                displayName = targetEntityId.split('.')[1]?.replace(/_/g, ' ') || targetEntityId;
+            // Only show friendly name if group name matches entity ID (auto-created)
+            if (groupName === targetEntityId) {
+                const entity = climateEntities.find(e => e.entity_id === targetEntityId);
+                if (entity && entity.attributes?.friendly_name) {
+                    displayName = entity.attributes.friendly_name;
+                } else {
+                    // Fallback to entity_id without the domain prefix
+                    displayName = targetEntityId.split('.')[1]?.replace(/_/g, ' ') || targetEntityId;
+                }
             }
+            // Otherwise keep displayName as groupName (user-created group)
         }
         
         const option = document.createElement('option');
@@ -1400,18 +1411,22 @@ function showAddToGroupModal(entityId) {
             return; // Skip this group
         }
         
-        // For single-entity groups, use the entity's friendly name
+        // For single-entity groups, use the entity's friendly name only if group name matches entity ID
         const isSingleEntity = groupData.entities && groupData.entities.length === 1;
         let displayName = groupName;
         if (isSingleEntity) {
             const entityId = groupData.entities[0];
-            const entity = climateEntities.find(e => e.entity_id === entityId);
-            if (entity && entity.attributes?.friendly_name) {
-                displayName = entity.attributes.friendly_name;
-            } else {
-                // Fallback to entity_id without the domain prefix
-                displayName = entityId.split('.')[1]?.replace(/_/g, ' ') || entityId;
+            // Only show friendly name if group name matches entity ID (auto-created)
+            if (groupName === entityId) {
+                const entity = climateEntities.find(e => e.entity_id === entityId);
+                if (entity && entity.attributes?.friendly_name) {
+                    displayName = entity.attributes.friendly_name;
+                } else {
+                    // Fallback to entity_id without the domain prefix
+                    displayName = entityId.split('.')[1]?.replace(/_/g, ' ') || entityId;
+                }
             }
+            // Otherwise keep displayName as groupName (user-created group)
         }
         
         const option = document.createElement('option');
